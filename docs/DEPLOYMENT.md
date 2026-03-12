@@ -247,13 +247,18 @@ PINATA_JWT=...
 
 The frontend is designed for **Vercel-only** hosting. A `vercel.json` at the repo root configures the monorepo build, security headers, CDN caching, and smart build-ignore rules automatically.
 
+> ⚠️ **Always run `vercel` from the repository root** (where `vercel.json` lives), **not** from your home directory or any other location.
+> Setting the Vercel project's Root Directory to anything other than `.` (e.g. `~/frontend`, `~\frontend`, or `frontend`) will cause the error _"The provided path does not exist"_. See the [Troubleshooting](#troubleshooting-vercel-root-directory) section if you hit this.
+
 ### Option A — Vercel CLI (quickest for first-time setup)
 
 ```bash
 # Install the CLI once
 npm install -g vercel
 
-# From the repo root (vercel.json is here)
+# cd into the repo root first — vercel.json must be in the current directory
+cd /path/to/cookbook
+
 vercel
 
 # Follow the prompts:
@@ -261,7 +266,7 @@ vercel
 #   → Set up and deploy? Yes
 #   → Which scope? (choose your account)
 #   → Link to existing project? No → new project name: goonforge
-#   → Project root directory? . (the repo root — vercel.json handles the build)
+#   → Project root directory? . ← type a single dot (repo root)
 #   → Override settings? No
 
 # After the preview deploy succeeds, promote to production:
@@ -273,7 +278,7 @@ vercel --prod
 1. Go to [vercel.com/new](https://vercel.com/new) → **Import Git Repository** → select `Unwrenchable/cookbook`.
 2. In **Configure Project**:
    - **Framework preset**: Next.js (auto-detected)
-   - **Root Directory**: `.` (leave as repo root — `vercel.json` points the build at `frontend/`)
+   - **Root Directory**: `.` (**leave blank / repo root** — `vercel.json` points the build at `frontend/`. Do **not** enter `frontend`, `~/frontend`, or `~\frontend`.)
    - **Build Command**: `pnpm turbo run build --filter=@tokenforge/frontend` *(pre-filled from `vercel.json`)*
    - **Output Directory**: `frontend/.next` *(pre-filled from `vercel.json`)*
    - **Install Command**: `pnpm install` *(pre-filled from `vercel.json`)*
@@ -456,6 +461,29 @@ pnpm deploy:bridge:avalanche
 | `vercel env pull` fails | Run `vercel login` first; ensure you linked the project with `vercel link` |
 | OPENAI / PINATA not working on Vercel | These are server-only keys — add them **without** `NEXT_PUBLIC_` prefix in Vercel Environment Variables |
 | `next build` fails locally | Run `pnpm install` from the repo root and retry |
+
+### Troubleshooting: Vercel Root Directory
+
+**Symptom:** `Error: The provided path "~\frontend" does not exist` (or any variant like `~/frontend`, `frontend`).
+
+**Cause:** The Vercel project's **Root Directory** setting was configured with an invalid path. Vercel expects paths relative to the repository root with forward slashes, and the tilde (`~`) is not expanded — it is treated as a literal directory name that does not exist in the repo.
+
+**Fix (Dashboard):**
+1. Go to your Vercel project → **Settings → General → Root Directory**.
+2. Clear the field so it is empty (defaults to `.`, the repository root).
+3. Confirm the following fields match:
+   - **Build Command**: `pnpm turbo run build --filter=@tokenforge/frontend`
+   - **Output Directory**: `frontend/.next`
+   - **Install Command**: `pnpm install`
+4. Click **Save**, then trigger a new deployment.
+
+**Fix (CLI):**
+Always run `vercel` from the repository root (the directory containing `vercel.json`):
+```bash
+cd /path/to/cookbook   # repo root — NOT your home directory
+vercel
+# When prompted "Project root directory?" enter:  .
+```
 
 ---
 
