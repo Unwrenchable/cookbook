@@ -1,0 +1,156 @@
+[
+  {
+    "id": "tokenforge-agent",
+    "role": "TokenForge Full-Stack Builder",
+    "description": "End-to-end builder for the TokenForge multi-chain token launcher. Owns Solana Anchor programs, EVM Solidity contracts, Next.js frontend, and the Wormhole cross-chain burn-to-activate bridge mechanic.",
+    "tags": ["solana", "evm", "cross-chain", "wormhole", "nft", "spl", "defi", "frontend"],
+    "capabilities": [
+      "solana-program-development",
+      "evm-contract-development",
+      "wormhole-integration",
+      "frontend-development",
+      "multi-chain-deployment",
+      "cross-chain-orchestration",
+      "nft-minting",
+      "bonding-curve-design",
+      "agent-governance"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "semantic_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal",
+      "github_repo",
+      "runSubagent"
+    ],
+    "preferred_profile": "power",
+    "risk_level": "medium"
+  },
+  {
+    "id": "solana-specialist",
+    "role": "Solana Program Specialist",
+    "description": "Expert in Anchor framework, SPL tokens, Metaplex NFTs, and Wormhole VAA emission on Solana. Builds and tests the token-burn-bridge Anchor program.",
+    "tags": ["solana", "anchor", "rust", "spl", "nft", "metaplex", "wormhole"],
+    "capabilities": [
+      "anchor-program-development",
+      "spl-token-management",
+      "metaplex-nft-minting",
+      "wormhole-vaa-emission",
+      "bonding-curve-implementation"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal"
+    ],
+    "preferred_profile": "balanced",
+    "risk_level": "medium"
+  },
+  {
+    "id": "evm-contract-engineer",
+    "role": "EVM Smart Contract Engineer",
+    "description": "Solidity developer focused on TokenFactory, template contracts, and BurnBridgeReceiver. Writes Hardhat tests and manages multi-chain deployments.",
+    "tags": ["evm", "solidity", "hardhat", "openzeppelin", "wormhole", "factory-pattern"],
+    "capabilities": [
+      "solidity-development",
+      "hardhat-testing",
+      "openzeppelin-patterns",
+      "wormhole-vaa-verification",
+      "multi-chain-deployment",
+      "contract-verification"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal"
+    ],
+    "preferred_profile": "balanced",
+    "risk_level": "medium"
+  },
+  {
+    "id": "cross-chain-orchestrator",
+    "role": "Cross-Chain Flow Orchestrator",
+    "description": "Coordinates the full Solana → Wormhole → EVM burn-to-activate pipeline. Understands VAA relaying, guardian networks, and cross-chain event indexing.",
+    "tags": ["cross-chain", "wormhole", "bridge", "solana", "evm", "relayer", "orchestration"],
+    "capabilities": [
+      "wormhole-vaa-orchestration",
+      "cross-chain-event-indexing",
+      "relayer-design",
+      "burn-to-activate-mechanic",
+      "multi-chain-state-sync"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "semantic_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal",
+      "github_repo",
+      "runSubagent"
+    ],
+    "preferred_profile": "power",
+    "risk_level": "medium"
+  },
+  {
+    "id": "security-auditor",
+    "role": "Smart Contract Security Auditor",
+    "description": "Reviews Solidity and Rust contracts for vulnerabilities: reentrancy, integer overflow, access control gaps, and Wormhole VAA replay attacks.",
+    "tags": ["security", "audit", "solidity", "rust", "wormhole", "reentrancy"],
+    "capabilities": [
+      "solidity-security-review",
+      "rust-security-review",
+      "wormhole-replay-protection",
+      "access-control-audit",
+      "reentrancy-analysis"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "semantic_search"
+    ],
+    "preferred_profile": "safe",
+    "risk_level": "low"
+  },
+  {
+    "id": "orchestrator",
+    "role": "Workflow Orchestrator",
+    "description": "Coordinates multi-agent workflows and handoffs across repos",
+    "tags": ["planning", "coordination", "multi-repo"],
+    "capabilities": ["task-breakdown", "status-tracking", "dependency-ordering"],
+    "required_tools": ["read_file", "list_dir", "runSubagent"],
+    "preferred_profile": "power",
+    "risk_level": "medium"
+  },
+  {
+    "id": "implementation-engineer",
+    "role": "Implementation Engineer",
+    "description": "Applies focused code changes with validation",
+    "tags": ["coding", "fixes", "delivery"],
+    "capabilities": ["patching", "validation", "targeted-refactors"],
+    "required_tools": ["read_file", "apply_patch", "create_file", "run_in_terminal"],
+    "preferred_profile": "balanced",
+    "risk_level": "medium"
+  },
+  {
+    "id": "capability-guardian",
+    "role": "Capability Guardian",
+    "description": "Checks whether an agent has enough and not too much access for a task",
+    "tags": ["security", "policy", "governance"],
+    "capabilities": ["least-privilege", "policy-check", "access-recommendation"],
+    "required_tools": ["read_file", "list_dir"],
+    "preferred_profile": "safe",
+    "risk_level": "low"
+  }
+]
