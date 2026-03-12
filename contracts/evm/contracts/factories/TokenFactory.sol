@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title TokenFactory
@@ -10,7 +11,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  *         One factory is deployed per chain; users call createToken() and never need to trust the deployer
  *         with private keys.
  */
-contract TokenFactory is Ownable {
+contract TokenFactory is Ownable, ReentrancyGuard {
     using Clones for address;
 
     // ─── Token flavors ────────────────────────────────────────────────────────
@@ -134,6 +135,7 @@ contract TokenFactory is Ownable {
     function createToken(TokenParams calldata params)
         external
         payable
+        nonReentrant
         returns (address tokenAddress)
     {
         require(msg.value >= launchFee, "TokenFactory: insufficient launch fee");
@@ -165,6 +167,7 @@ contract TokenFactory is Ownable {
     function createTokenWithReferral(TokenParams calldata params, address referrer)
         external
         payable
+        nonReentrant
         returns (address tokenAddress)
     {
         require(msg.value >= launchFee, "TokenFactory: insufficient launch fee");
@@ -199,7 +202,7 @@ contract TokenFactory is Ownable {
     /**
      * @notice Referrers call this to withdraw their accumulated earnings.
      */
-    function claimReferralEarnings() external {
+    function claimReferralEarnings() external nonReentrant {
         uint256 amount = referralEarnings[msg.sender];
         require(amount > 0, "TokenFactory: nothing to claim");
         referralEarnings[msg.sender] = 0;

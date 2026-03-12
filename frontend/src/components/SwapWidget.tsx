@@ -7,8 +7,9 @@
  */
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useCallback, useRef } from "react";
 import { useChainId, useAccount, useReadContract, useWriteContract } from "wagmi";
+import { parseEther } from "viem";
 
 // Per-chain DEX config
 interface DexConfig {
@@ -157,12 +158,11 @@ const ERC20_APPROVE_ABI = [
   },
 ] as const;
 
-// Parse a user-entered ETH amount string to bigint wei
-function parseEth(val: string): bigint {
+// Parse a user-entered ETH/token amount string to bigint wei using viem's parseEther
+function safeParseEther(val: string): bigint {
   try {
-    const n = parseFloat(val);
-    if (isNaN(n) || n <= 0) return 0n;
-    return BigInt(Math.floor(n * 1e18));
+    if (!val || parseFloat(val) <= 0) return 0n;
+    return parseEther(val as `${number}`);
   } catch {
     return 0n;
   }
@@ -181,10 +181,19 @@ export function SwapWidget() {
   // On-chain swap state
   const [swapDirection, setSwapDirection] = useState<"ethToToken" | "tokenToEth">("ethToToken");
   const [amountIn, setAmountIn]   = useState("");
+  // Debounced amount used for the read contract call
+  const [debouncedAmountIn, setDebouncedAmountIn] = useState("");
   const [estimatedOut, setEstimatedOut] = useState<bigint | null>(null);
   const [swapStatus, setSwapStatus] = useState<"idle" | "approving" | "swapping" | "success" | "error">("idle");
   const [swapError,  setSwapError]  = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleAmountChange = useCallback((val: string) => {
+    setAmountIn(val);
+    setEstimatedOut(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => setDebouncedAmountIn(val), 500);
+  }, []);
 
   const routerAddress = UNISWAP_V2_ROUTERS[chainId];
   const isEthToToken  = swapDirection === "ethToToken";
@@ -197,34 +206,32 @@ export function SwapWidget() {
     return isEthToToken ? [wrapped, out] : [out, wrapped];
   })();
 
-  const amountInWei = parseEth(amountIn);
+  const amountInWei = safeParseEther(amountIn);
+  const debouncedAmountInWei = safeParseEther(debouncedAmountIn);
 
-  // getAmountsOut query (enabled only when we have valid input + router)
+  // getAmountsOut query (debounced — only fires after user stops typing)
   const { data: amountsOut } = useReadContract(
-    routerAddress && amountInWei > 0n && swapPath[0] !== swapPath[1]
+    routerAddress && debouncedAmountInWei > 0n && swapPath[0] !== swapPath[1]
       ? {
           address: routerAddress,
           abi: UNISWAP_V2_ABI,
           functionName: "getAmountsOut",
-          args: [amountInWei, swapPath],
+          args: [debouncedAmountInWei, swapPath],
         }
       : undefined
   );
 
-  // Update estimated output with debounce
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      if (Array.isArray(amountsOut) && amountsOut.length >= 2) {
-        setEstimatedOut(amountsOut[amountsOut.length - 1] as bigint);
-      } else {
-        setEstimatedOut(null);
-      }
-    }, 500);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [amountsOut]);
+  // Update estimated output when amountsOut resolves
+  const lastAmountsOut = useRef<readonly bigint[] | undefined>(undefined);
+  if (amountsOut !== lastAmountsOut.current) {
+    lastAmountsOut.current = amountsOut as readonly bigint[] | undefined;
+    if (Array.isArray(amountsOut) && amountsOut.length >= 2) {
+      // Use a microtask to avoid setState during render
+      Promise.resolve().then(() =>
+        setEstimatedOut(amountsOut[amountsOut.length - 1] as bigint)
+      );
+    }
+  }
 
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
@@ -424,7 +431,7 @@ export function SwapWidget() {
                 <input
                   type="number"
                   value={amountIn}
-                  onChange={(e) => { setAmountIn(e.target.value); setEstimatedOut(null); }}
+                  onChange={(e) => handleAmountChange(e.target.value)}
                   placeholder="0.0"
                   min="0"
                   step="any"
