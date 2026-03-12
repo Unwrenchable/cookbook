@@ -1,6 +1,6 @@
 # GOONFORGE.XYZ
 
-**The degen launchpad that prints the next 100x.**
+The degen launchpad that prints the next 100x.
 
 Launch any meme, any chain, any flavor in under 60 seconds.  
 Testnet toggle. Bonding curves. Tax/Reflection/AI tokens. Renounce + lock + liquidity add in one click.
@@ -203,3 +203,4 @@ Follow the folder structure above. PRs welcome!
 ---
 
 *Built with ❤️ for degens who want to launch in 60 seconds.*
+
