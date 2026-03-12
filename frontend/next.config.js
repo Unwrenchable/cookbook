@@ -29,8 +29,10 @@ const nextConfig = {
           // Content-Security-Policy for a Web3 dApp:
           // - script-src includes 'unsafe-eval' required by ethers.js / wagmi bundles
           //   and some wallet extension injections.
-          // - connect-src allows Alchemy RPCs, WalletConnect relayer, Solana RPCs,
+          // - connect-src allows our own /api/* proxy routes (which forward to Alchemy
+          //   server-side), WalletConnect relayer, public Solana/BSC/Avalanche RPCs,
           //   Wormhole Scan API, and Pinata IPFS.
+          // - Alchemy RPCs are NOT listed here — the browser calls /api/rpc/* instead.
           {
             key: "Content-Security-Policy",
             value: [
@@ -40,15 +42,13 @@ const nextConfig = {
               "img-src 'self' data: blob: https://ipfs.io https://*.ipfs.io https://cloudflare-ipfs.com https://raw.githubusercontent.com https://token-icons.s3.amazonaws.com",
               "font-src 'self' data:",
               "connect-src 'self'" +
-                " https://*.g.alchemy.com" +           // Alchemy RPCs
-                " https://*.alchemyapi.io" +
                 " https://relay.walletconnect.com" +   // WalletConnect relay
                 " https://relay.walletconnect.org" +
                 " https://*.walletconnect.com" +
                 " https://*.walletconnect.org" +
                 " wss://relay.walletconnect.com" +     // WC websocket
                 " wss://relay.walletconnect.org" +
-                " https://api.mainnet-beta.solana.com" + // Solana public RPC
+                " https://api.mainnet-beta.solana.com" + // Solana public RPC (proxy fallback)
                 " https://api.devnet.solana.com" +
                 " https://api.wormholescan.io" +       // Wormhole VAA API
                 " https://api.pinata.cloud" +          // Pinata IPFS upload
