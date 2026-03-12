@@ -107,7 +107,15 @@ async function main() {
   // Solana emitter = the token-burn-bridge program ID encoded as bytes32
   // Run `anchor build` to get the real program ID, then convert:
   //   node -e "const {PublicKey}=require('@solana/web3.js'); console.log('0x'+Buffer.from(new PublicKey('YOUR_PROGRAM_ID').toBytes()).toString('hex'))"
-  const rawSolanaEmitter = process.env.SOLANA_EMITTER ?? "0x" + "00".repeat(32);
+  const rawSolanaEmitter = process.env.SOLANA_EMITTER;
+  if (!rawSolanaEmitter || rawSolanaEmitter === "0x" + "00".repeat(32)) {
+    throw new Error(
+      "Missing or zero SOLANA_EMITTER in .env.\n" +
+      "  Set it to the token-burn-bridge program ID as a 32-byte hex string.\n" +
+      "  Derive it with: node -e \"const {PublicKey}=require('@solana/web3.js'); " +
+      "console.log('0x'+Buffer.from(new PublicKey('YOUR_PROGRAM_ID').toBytes()).toString('hex'))\""
+    );
+  }
   const trustedSolanaEmitter = ethers.zeroPadValue(rawSolanaEmitter, 32) as `0x${string}`;
 
   // Mintable token address for this chain (must grant MINTER_ROLE to the deployed receiver)

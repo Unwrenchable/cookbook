@@ -125,7 +125,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
             </p>
           ) : (
             <p className="text-xs text-purple-600 mt-0.5">
-              Phantom · Solflare · Backpack · Coinbase
+              Phantom · Solflare · Coinbase Wallet
             </p>
           )}
         </div>
