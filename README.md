@@ -1,39 +1,55 @@
-# TokenForge – Multi-Chain Token Launcher
+# GOONFORGE.XYZ
 
-Full-stack dApp that lets anyone launch custom ERC20 tokens on any EVM chain in **under 60 seconds**. No code required.
+**The degen launchpad that prints the next 100x.**
+
+Launch any meme, any chain, any flavor in under 60 seconds.  
+Testnet toggle. Bonding curves. Tax/Reflection/AI tokens. Renounce + lock + liquidity add in one click.
+
+Built by frens. For frens who actually goon the charts.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Site](https://img.shields.io/badge/site-GOONFORGE.XYZ-a3e635?style=flat)](https://goonforge.xyz)
+
+---
 
 ## Vision
 
-A beautiful, secure, production-ready launchpad that supports testnets and mainnets simultaneously, multiple token flavors, and both EVM + Solana (coming soon).
+A dark, beautiful, production-ready degen launchpad supporting testnets and mainnets simultaneously, every token flavor from Standard ERC20 to bonding-curve memes, built-in LP locking, a swap widget, and Solana-first cross-chain burn activation.
 
 ---
 
 ## Features
 
 ### MVP (shipped)
-- 🔗 Wallet connect (MetaMask, WalletConnect, Coinbase Wallet via RainbowKit)
-- 🌐 Chain selector with one-click **Testnet ↔ Mainnet toggle**
-- 🎨 5 token flavors:
+- 🔗 **Wallet auto-detect** — MetaMask, WalletConnect, Coinbase Wallet, Phantom via RainbowKit (EIP-6963)
+- 🌐 **Chain selector** with one-click **Testnet ↔ Mainnet toggle** (ETH, BSC, Polygon, Arbitrum, Base, Avalanche)
+- 🎨 **9 token flavors:**
   1. **Standard ERC20** – plain transferable token
   2. **Taxable** – configurable buy/sell tax forwarded to a marketing wallet
   3. **Deflationary** – auto-burn on every transfer
   4. **Reflection** – redistribution to all holders
   5. **Bonding Curve** – pump.fun-style meme token (price increases with supply)
-- 📝 Dynamic form that shows/hides fields based on chosen flavor
+  6. **🤖 AI Agent** – on-chain AI agent wallet with daily burn cap + meme posting
+  7. **🏛️ PolitiFi** – binary prediction market, prize pool for winners, burn for losers
+  8. **⚙️ Utility Hybrid** – built-in staking, auto-burn, team wallet cap, governance
+  9. **📈 Pump → CEX** – bonding curve that graduates to CEX when ETH threshold is hit
+- 📝 Dynamic form with flavor-based fields
 - 🚀 One-click deploy via **factory + clone pattern** (gas < $2 on most chains)
-- 📋 "My Tokens" dashboard – see every token you've deployed on the current chain
+- 🔒 **Built-in LP Locker** — lock your LP tokens on-chain with a time lock
+- 💱 **Swap Widget** — quick-launch swap links for each chain's primary DEX
+- 🔥 **Solana-first cross-chain burn** — burn SPL tokens to activate EVM chains via Wormhole
+- 🔮 **Vanity address generator** — mine custom addresses like `0xcaps...` or `0xfizz...`
+- 📋 "My Tokens" dashboard — every token you've deployed on the current chain
 - 🛡️ Factory is immutable; users never trust us with private keys
 
-### v1 (planned)
+### v2 (planned)
 - 0.5% launch fee (collected in native token)
 - IPFS logo + metadata upload
 - Auto-listing stubs for DexTools / CoinMarketCap
 - Basic audit report (Slither + checklist)
-- Solana SPL token support (Anchor / Rust)
-- Cross-chain bridge (LayerZero)
+- Native on-chain DEX swap (direct router integration)
 - Referral system
+- AI token description generator
 
 ---
 

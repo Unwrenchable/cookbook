@@ -2,7 +2,7 @@ import { ethers, network } from "hardhat";
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  console.log(`\nDeploying TokenForge contracts on network: ${network.name}`);
+  console.log(`\nDeploying GOONFORGE contracts on network: ${network.name}`);
   console.log(`Deployer: ${deployer.address}`);
   console.log(`Balance:  ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} ETH\n`);
 
@@ -84,12 +84,23 @@ async function main() {
   console.log(`  Launch fee         : ${ethers.formatEther(launchFee)} ETH`);
   console.log(`  Fee recipient      : ${feeRecipient}`);
 
-  // ─── 3. Summary ───────────────────────────────────────────────────────────
-  console.log("\n=== Deployment Summary ===");
+  // ─── 3. Deploy the LP Locker ──────────────────────────────────────────────
+  console.log("\nDeploying LPLocker...");
+
+  const LPLockerFactory = await ethers.getContractFactory("LPLocker");
+  const lpLocker = await LPLockerFactory.deploy();
+  await lpLocker.waitForDeployment();
+
+  const lpLockerAddress = await lpLocker.getAddress();
+  console.log(`  LPLocker           → ${lpLockerAddress}`);
+
+  // ─── 4. Summary ───────────────────────────────────────────────────────────
+  console.log("\n=== GOONFORGE Deployment Summary ===");
   console.log(JSON.stringify({
     network:         network.name,
     deployer:        deployer.address,
     tokenFactory:    factoryAddress,
+    lpLocker:        lpLockerAddress,
     implementations: {
       standard:      await standardImpl.getAddress(),
       taxable:       await taxableImpl.getAddress(),
@@ -103,7 +114,7 @@ async function main() {
     },
   }, null, 2));
 
-  console.log("\nAdd the factory address to frontend/src/lib/chains.ts and you're live!");
+  console.log("\nAdd the addresses to frontend/.env.local and you're live on GOONFORGE.XYZ!");
 }
 
 main()

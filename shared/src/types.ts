@@ -1,5 +1,5 @@
 /**
- * types.ts – Shared TypeScript types for TokenForge.
+ * types.ts – Shared TypeScript types for GOONFORGE.XYZ.
  */
 
 export enum TokenFlavor {

@@ -59,8 +59,14 @@ export function DeployResult({ result, chainId, onReset }: Props) {
         <p className="font-semibold text-gray-700">Next steps</p>
         <ul className="list-inside list-disc space-y-1 text-gray-600">
           <li>Add liquidity on Uniswap / PancakeSwap</li>
+          <li>
+            🔒 Lock LP tokens using the{" "}
+            <strong>Lock LP</strong> tab above — no third party needed
+          </li>
+          <li>
+            💱 Swap instantly via the <strong>Swap</strong> tab
+          </li>
           <li>Renounce ownership (from the token contract&apos;s write functions)</li>
-          <li>Lock LP tokens via Team Finance or Unicrypt</li>
           <li>Submit a listing on DexTools / CoinGecko</li>
         </ul>
       </div>

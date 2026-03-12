@@ -1,5 +1,8 @@
 /**
- * wagmiConfig.ts – wagmi + RainbowKit configuration for TokenForge.
+ * wagmiConfig.ts – wagmi + RainbowKit configuration for GOONFORGE.XYZ.
+ * Uses getDefaultConfig which enables EIP-6963 wallet auto-detection
+ * (MetaMask, Coinbase Wallet, Phantom EVM, and any injected wallet
+ * are discovered automatically — no manual connector list needed).
  */
 "use client";
 
@@ -21,7 +24,7 @@ import {
 const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID ?? "YOUR_WC_PROJECT_ID";
 
 export const wagmiConfig = getDefaultConfig({
-  appName: "TokenForge",
+  appName: "GOONFORGE",
   projectId: WC_PROJECT_ID,
   chains: [
     // Mainnets

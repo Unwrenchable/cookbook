@@ -6,10 +6,20 @@ import { Providers } from "@/components/Providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "TokenForge – Multi-Chain Token Launcher",
+  title: "GOONFORGE.XYZ – The Degen Token Launchpad",
   description:
-    "Launch custom ERC20 tokens on any EVM chain in under 60 seconds. No code required.",
-  keywords: ["token launcher", "ERC20", "DeFi", "multi-chain", "Ethereum", "BSC", "Polygon"],
+    "The degen launchpad that prints the next 100x. Launch any meme, any chain, any flavor in under 60 seconds. Testnet toggle. Bonding curves. Tax/Reflection/AI tokens. Renounce + lock + liquidity add in one click.",
+  keywords: [
+    "token launcher", "meme coin", "degen", "ERC20", "DeFi", "multi-chain",
+    "Ethereum", "BSC", "Solana", "bonding curve", "LP locker", "pump fun",
+  ],
+  openGraph: {
+    title: "GOONFORGE.XYZ – The Degen Token Launchpad",
+    description: "Launch any meme, any chain, any flavor in under 60 seconds.",
+    url: "https://goonforge.xyz",
+    siteName: "GOONFORGE",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

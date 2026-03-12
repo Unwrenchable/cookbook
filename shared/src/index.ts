@@ -1,4 +1,4 @@
 /**
- * index.ts – Shared exports for TokenForge packages.
+ * index.ts – Shared exports for GOONFORGE.XYZ packages.
  */
 export * from "./types";

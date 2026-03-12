@@ -1,5 +1,5 @@
 /**
- * app/page.tsx – Main launcher page.
+ * app/page.tsx – GOONFORGE.XYZ main launcher page.
  */
 "use client";
 
@@ -12,11 +12,13 @@ import { DeployResult } from "@/components/DeployResult";
 import { TokenDashboard } from "@/components/TokenDashboard";
 import { SolanaLaunchPanel } from "@/components/SolanaLaunchPanel";
 import { VanityAddressGenerator } from "@/components/VanityAddressGenerator";
+import { LPLockerPanel } from "@/components/LPLockerPanel";
+import { SwapWidget } from "@/components/SwapWidget";
 import { useDeployToken } from "@/hooks/useDeployToken";
 import { getChainById } from "@/lib/chains";
 import type { TokenFormData } from "@/lib/types";
 
-type Tab = "evm" | "solana-bridge" | "vanity" | "dashboard";
+type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "vanity" | "dashboard";
 
 export default function HomePage() {
   const { isConnected } = useAccount();
@@ -25,46 +27,61 @@ export default function HomePage() {
 
   const { deploy, isPending, error, deployResult, launchFee } = useDeployToken();
 
-  const [activeTab,   setActiveTab]   = useState<Tab>("evm");
-  const [isTestnet,   setIsTestnet]   = useState(false);
+  const [activeTab,  setActiveTab]  = useState<Tab>("evm");
+  const [isTestnet,  setIsTestnet]  = useState(false);
 
   async function handleDeploy(formData: TokenFormData) {
     try {
       await deploy(formData);
     } catch {
-      // error is captured in the hook
+      // error captured in hook
     }
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: "evm",           label: "🚀 EVM Launch"        },
-    { id: "solana-bridge", label: "🔥 Solana → All Chains" },
-    { id: "vanity",        label: "🔮 Vanity Address"     },
-    { id: "dashboard",     label: "📋 My Tokens"          },
+    { id: "evm",           label: "🚀 Launch"             },
+    { id: "solana-bridge", label: "🔥 Solana Bridge"       },
+    { id: "lock",          label: "🔒 Lock LP"             },
+    { id: "swap",          label: "💱 Swap"                },
+    { id: "vanity",        label: "🔮 Vanity Address"      },
+    { id: "dashboard",     label: "📋 My Tokens"           },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-dark-bg text-white">
 
       {/* ─── Header ───────────────────────────────────────────────────────── */}
-      <header className="border-b border-gray-200 bg-white">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2">
+      <header className="border-b border-dark-border bg-dark-card/80 backdrop-blur-md sticky top-0 z-50">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
+          {/* Logo */}
+          <div className="flex items-center gap-2.5">
             <span className="text-2xl">⚒️</span>
-            <span className="text-xl font-bold text-gray-900">TokenForge</span>
-            <span className="hidden rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700 sm:inline">
+            <div className="leading-tight">
+              <span className="block text-base font-black tracking-tight text-brand-400 drop-shadow-[0_0_8px_rgba(163,230,53,0.6)]">
+                GOONFORGE.XYZ
+              </span>
+              <span className="hidden sm:block text-[10px] text-gray-500 uppercase tracking-widest">
+                Degen Launchpad
+              </span>
+            </div>
+            <span className="hidden rounded-full border border-brand-500/40 bg-brand-500/10 px-2 py-0.5 text-[10px] font-bold text-brand-400 sm:inline uppercase tracking-wider">
               Multi-Chain
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Global testnet toggle */}
+
+          <div className="flex items-center gap-2.5">
+            {/* Wallet auto-detect badge */}
+            <span className="hidden sm:inline text-[10px] text-gray-500 border border-dark-border rounded-full px-2 py-1">
+              🔍 Auto-detects wallets
+            </span>
+            {/* Testnet toggle */}
             <button
               type="button"
               onClick={() => setIsTestnet((v) => !v)}
               className={`hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border transition-colors ${
                 isTestnet
-                  ? "border-yellow-300 bg-yellow-50 text-yellow-700"
-                  : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
+                  ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-400"
+                  : "border-dark-border bg-dark-muted text-gray-400 hover:border-gray-500"
               }`}
             >
               {isTestnet ? "🧪 Testnet" : "🌐 Mainnet"}
@@ -75,19 +92,34 @@ export default function HomePage() {
       </header>
 
       {/* ─── Hero ─────────────────────────────────────────────────────────── */}
-      <section className="border-b border-gray-100 bg-white py-10 text-center">
-        <h1 className="text-3xl font-extrabold tracking-tight text-gray-900 sm:text-4xl">
-          Launch your token in{" "}
-          <span className="text-brand-600">&lt; 60 seconds</span>
-        </h1>
-        <p className="mt-3 text-lg text-gray-500 max-w-xl mx-auto">
-          No code. No trust. EVM factory pattern or Solana-first burn-to-activate across every chain.
-        </p>
-        {/* Cross-chain explainer pills */}
-        <div className="mt-5 flex flex-wrap justify-center gap-2 text-xs text-gray-500">
-          {["Ethereum", "BSC", "Polygon", "Arbitrum", "Base", "Avalanche", "Solana"].map((c) => (
-            <span key={c} className="rounded-full border border-gray-200 bg-white px-3 py-1">{c}</span>
-          ))}
+      <section className="border-b border-dark-border bg-gradient-to-b from-dark-card to-dark-bg py-10 text-center">
+        <div className="mx-auto max-w-2xl px-4">
+          <h1 className="text-4xl font-black tracking-tight sm:text-5xl">
+            <span className="text-white">The degen launchpad that</span>{" "}
+            <span className="text-brand-400 drop-shadow-[0_0_16px_rgba(163,230,53,0.5)]">
+              prints the next 100x
+            </span>
+          </h1>
+          <p className="mt-4 text-base text-gray-400 max-w-xl mx-auto leading-relaxed">
+            Launch any meme, any chain, any flavor in under{" "}
+            <span className="text-brand-400 font-semibold">60 seconds</span>.{" "}
+            Testnet toggle. Bonding curves. Tax / Reflection / AI tokens.
+            Renounce + lock + liquidity add in one click.
+          </p>
+          <p className="mt-2 text-sm text-gray-600 italic">
+            Built by frens. For frens who actually goon the charts.
+          </p>
+          {/* Chain pills */}
+          <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs">
+            {["Ethereum", "BSC", "Polygon", "Arbitrum", "Base", "Avalanche", "Solana"].map((c) => (
+              <span
+                key={c}
+                className="rounded-full border border-dark-border bg-dark-card px-3 py-1 text-gray-400"
+              >
+                {c}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -95,16 +127,16 @@ export default function HomePage() {
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
 
         {/* Tab bar */}
-        <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-100 p-1 w-fit flex-wrap">
+        <div className="flex gap-1 rounded-xl border border-dark-border bg-dark-card p-1 w-fit flex-wrap">
           {tabs.map(({ id, label }) => (
             <button
               key={id}
               type="button"
               onClick={() => setActiveTab(id)}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === id
-                  ? "bg-white shadow text-gray-900"
-                  : "text-gray-500 hover:text-gray-700"
+                  ? "bg-brand-600 text-white shadow-sm"
+                  : "text-gray-400 hover:text-white"
               }`}
             >
               {label}
@@ -116,16 +148,18 @@ export default function HomePage() {
         {activeTab === "evm" && (
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-800">1. Select Network</h2>
-              <ChainSelector />
+              <SectionTitle>1. Select Network</SectionTitle>
+              <Card>
+                <ChainSelector />
+              </Card>
             </div>
             <div className="lg:col-span-2 space-y-4">
-              <h2 className="text-base font-semibold text-gray-800">2. Configure &amp; Deploy</h2>
+              <SectionTitle>2. Configure &amp; Deploy</SectionTitle>
               {!isConnected ? (
-                <div className="rounded-xl border border-dashed border-gray-300 bg-white p-10 text-center space-y-3">
-                  <p className="text-gray-500 text-sm">Connect your wallet to get started.</p>
+                <Card className="p-10 text-center space-y-3">
+                  <p className="text-gray-400 text-sm">Connect your wallet to get started.</p>
                   <ConnectButton />
-                </div>
+                </Card>
               ) : deployResult ? (
                 <DeployResult
                   result={deployResult}
@@ -133,14 +167,14 @@ export default function HomePage() {
                   onReset={() => window.location.reload()}
                 />
               ) : (
-                <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <Card>
                   {!chainConfig?.factoryAddress && (
-                    <div className="mb-4 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
-                      ⚠️ No factory on <strong>{chainConfig?.name ?? `chain ${chainId}`}</strong> yet.
+                    <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
+                      ⚠️ No factory on <strong>{chainConfig?.name ?? `chain ${chainId}`}</strong> yet. Deploy one first.
                     </div>
                   )}
                   {error && (
-                    <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
                       {error.message}
                     </div>
                   )}
@@ -150,62 +184,107 @@ export default function HomePage() {
                     launchFee={launchFee as bigint | undefined}
                     nativeCurrencySymbol={chainConfig?.nativeCurrency.symbol ?? "ETH"}
                   />
-                </div>
+                </Card>
               )}
             </div>
           </div>
         )}
 
-        {/* ── Solana-first Bridge ─────────────────────────────────────────── */}
+        {/* ── Solana Bridge ───────────────────────────────────────────────── */}
         {activeTab === "solana-bridge" && (
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-800">How it works</h2>
-              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 space-y-3">
+              <SectionTitle>How it works</SectionTitle>
+              <Card className="text-sm text-gray-400 space-y-3">
                 <Step n={1} text="Hold SPL tokens on Solana" />
                 <Step n={2} text="Burn tokens → Wormhole emits a VAA" />
                 <Step n={3} text="VAA is relayed to your chosen EVM chains" />
                 <Step n={4} text="ERC20 tokens minted to your EVM address" />
-                <div className="mt-2 rounded-lg bg-orange-50 border border-orange-200 p-3 text-xs text-orange-700">
-                  <strong>Burn tiers:</strong><br />
+                <div className="mt-2 rounded-lg bg-orange-500/10 border border-orange-500/30 p-3 text-xs text-orange-300">
+                  <strong className="text-orange-400">Burn tiers:</strong><br />
                   100 tokens → 1 chain<br />
                   500 tokens → 3 chains<br />
                   1,000 tokens → all chains
                 </div>
-              </div>
+              </Card>
             </div>
             <div className="lg:col-span-2">
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <Card>
                 <SolanaLaunchPanel isTestnet={isTestnet} />
-              </div>
+              </Card>
             </div>
           </div>
         )}
 
-        {/* ── Vanity Address Generator ────────────────────────────────────── */}
+        {/* ── Lock LP ─────────────────────────────────────────────────────── */}
+        {activeTab === "lock" && (
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="space-y-4">
+              <SectionTitle>Why lock LP?</SectionTitle>
+              <Card className="text-sm text-gray-400 space-y-3">
+                <Step n={1} text="Add liquidity on Uniswap / PancakeSwap to get LP tokens" />
+                <Step n={2} text="Paste the LP token address and choose a lock duration" />
+                <Step n={3} text="Approve the locker contract, then lock" />
+                <Step n={4} text="Your community sees the lock on-chain — no rug risk" />
+                <div className="rounded-lg bg-brand-500/10 border border-brand-500/30 p-3 text-xs text-brand-300">
+                  <strong>Locked = No rug.</strong> The contract holds your LP tokens until the unlock date. Not even you can touch them early.
+                </div>
+              </Card>
+            </div>
+            <div className="lg:col-span-2">
+              <Card>
+                <LPLockerPanel />
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ── Swap ────────────────────────────────────────────────────────── */}
+        {activeTab === "swap" && (
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="space-y-4">
+              <SectionTitle>Quick Swap</SectionTitle>
+              <Card className="text-sm text-gray-400 space-y-3">
+                <Step n={1} text="Paste your newly deployed token address in 'To token'" />
+                <Step n={2} text="Choose a DEX for your chain" />
+                <Step n={3} text="Opens with the pair pre-filled — just set your amount and swap" />
+                <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-3 text-xs text-blue-300">
+                  <strong>Native on-chain swap</strong> (no redirect) coming in v2.
+                </div>
+              </Card>
+            </div>
+            <div className="lg:col-span-2">
+              <Card>
+                <SwapWidget />
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* ── Vanity Address ──────────────────────────────────────────────── */}
         {activeTab === "vanity" && (
           <div className="grid gap-6 lg:grid-cols-3">
             <div className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-800">How vanity addresses work</h2>
-              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 space-y-3">
-                <Step n={1} text="Choose a prefix like "cafe", "dead", or "f122" (fizz in leet hex)" />
+              <SectionTitle>Vanity Addresses</SectionTitle>
+              <Card className="text-sm text-gray-400 space-y-3">
+                <Step n={1} text='Choose a prefix like "cafe", "dead", or "f122" (fizz in leet hex)' />
                 <Step n={2} text="The miner generates random private keys until an address matches" />
-                <Step n={3} text="Copy and save the private key — it's never stored" />
+                <Step n={3} text="Copy and save the private key — it's never stored or sent anywhere" />
                 <Step n={4} text="Import into MetaMask or use as your token's owner address" />
-              </div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-                <p className="font-semibold mb-1">Leet-hex cheatsheet</p>
+              </Card>
+              <Card className="text-xs text-gray-500">
+                <p className="font-semibold mb-1 text-gray-400">Leet-hex cheatsheet</p>
                 <div className="grid grid-cols-2 gap-0.5 font-mono">
                   {[["fizz","f122"],["caps","ca95"],["dead","dead"],["cafe","cafe"],["face","face"],["beef","beef"]].map(([w,h])=>(
-                    <span key={w}>{w} → {h}</span>
+                    <span key={w} className="text-brand-400">{w} → <span className="text-gray-400">{h}</span></span>
                   ))}
                 </div>
-              </div>
+              </Card>
             </div>
             <div className="lg:col-span-2">
-              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+              <Card>
                 <VanityAddressGenerator />
-              </div>
+              </Card>
             </div>
           </div>
         )}
@@ -213,24 +292,41 @@ export default function HomePage() {
         {/* ── Dashboard ───────────────────────────────────────────────────── */}
         {activeTab === "dashboard" && (
           <div className="space-y-4">
-            <h2 className="text-base font-semibold text-gray-800">My Deployed Tokens</h2>
+            <SectionTitle>My Deployed Tokens</SectionTitle>
             <TokenDashboard />
           </div>
         )}
       </main>
 
       {/* ─── Footer ───────────────────────────────────────────────────────── */}
-      <footer className="mt-16 border-t border-gray-200 py-8 text-center text-sm text-gray-400">
-        TokenForge · Solana burns activate every chain ·{" "}
-        <a
-          href="https://github.com/Unwrenchable/cookbook"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:underline"
-        >
-          GitHub
-        </a>
+      <footer className="mt-16 border-t border-dark-border py-8 text-center text-sm text-gray-600">
+        <p className="font-black text-brand-500 text-base tracking-tight">GOONFORGE.XYZ</p>
+        <p className="mt-1 text-gray-600">
+          Solana burns activate every chain · Built by frens, for frens ·{" "}
+          <a
+            href="https://github.com/Unwrenchable/cookbook"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-brand-600 hover:text-brand-400 hover:underline"
+          >
+            GitHub
+          </a>
+        </p>
       </footer>
+    </div>
+  );
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <h2 className="text-sm font-semibold text-gray-300">{children}</h2>;
+}
+
+function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`rounded-2xl border border-dark-border bg-dark-card p-6 ${className}`}>
+      {children}
     </div>
   );
 }
@@ -238,10 +334,11 @@ export default function HomePage() {
 function Step({ n, text }: { n: number; text: string }) {
   return (
     <div className="flex items-start gap-3">
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-orange-100 text-xs font-bold text-orange-600">
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/20 text-xs font-bold text-brand-400">
         {n}
       </span>
       <span>{text}</span>
     </div>
   );
 }
+
