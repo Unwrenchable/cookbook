@@ -2,11 +2,12 @@
  * SolanaLaunchPanel.tsx – UI for the Solana-first cross-chain burn-to-activate mechanic.
  *
  * The user:
- *  1. Connects their Phantom (or any Solana) wallet via the wallet-adapter button.
- *  2. Selects how many SPL tokens to burn.
- *  3. Chooses which EVM chains to activate.
- *  4. Enters their EVM recipient address.
- *  5. Clicks "Burn & Activate" → wallet signs the Solana transaction → Wormhole VAA → EVM mint.
+ *  1. Connects their Phantom / Solflare / Backpack wallet via the wallet-adapter button.
+ *  2. Pastes their SPL token mint address.
+ *  3. Selects how many SPL tokens to burn (chooses a burn tier).
+ *  4. Chooses which EVM chains to activate.
+ *  5. Enters their EVM recipient address.
+ *  6. Clicks "Burn & Activate" → wallet signs the Solana tx → Wormhole VAA → EVM mint.
  */
 "use client";
 
@@ -15,7 +16,6 @@ import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import {
   BURN_TIERS,
   getBurnTier,
-  CROSS_CHAIN_TARGETS,
   TESTNET_TARGETS,
   MAINNET_TARGETS,
 } from "@/lib/crossChain";
@@ -29,12 +29,17 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
   const targets = isTestnet ? TESTNET_TARGETS : MAINNET_TARGETS;
   const { state, launch, reset, connected, publicKey } = useSolanaLaunch();
 
-  const [burnAmount,      setBurnAmount]      = useState(100);
-  const [evmRecipient,    setEvmRecipient]    = useState("");
-  const [selectedChains,  setSelectedChains]  = useState<number[]>([]);
+  const [tokenMint,      setTokenMint]      = useState("");
+  const [burnAmount,     setBurnAmount]     = useState(100);
+  const [evmRecipient,   setEvmRecipient]   = useState("");
+  const [selectedChains, setSelectedChains] = useState<number[]>([]);
 
-  const tier            = getBurnTier(burnAmount);
-  const maxChainsAllowed = tier ? (tier.chainsActivated === Infinity ? targets.length : tier.chainsActivated) : 0;
+  const tier             = getBurnTier(burnAmount);
+  const maxChainsAllowed = tier
+    ? tier.chainsActivated === Infinity
+      ? targets.length
+      : tier.chainsActivated
+    : 0;
 
   function toggleChain(chainId: number) {
     setSelectedChains((prev) => {
@@ -47,6 +52,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     await launch({
+      tokenMint,
       burnAmount,
       targetChainIds: selectedChains,
       evmRecipient,
@@ -72,14 +78,28 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
           </div>
         )}
         <ul className="space-y-1 text-sm">
-          {selectedChains.map((chainId) => {
-            const t = targets.find((x) => x.wormholeChainId === chainId);
-            return t ? (
-              <li key={chainId} className="flex items-center gap-2 text-gray-700">
-                <span className="text-green-500">✓</span> {t.name}
-              </li>
-            ) : null;
-          })}
+          {state.evmResults.length > 0
+            ? state.evmResults.map((r) => (
+                <li key={r.chainName} className="flex items-center gap-2 text-gray-700">
+                  <span className={r.txHash ? "text-green-500" : "text-red-400"}>
+                    {r.txHash ? "✓" : "✗"}
+                  </span>
+                  {r.chainName}
+                  {r.txHash && (
+                    <span className="text-xs font-mono text-gray-400 truncate">
+                      {r.txHash.slice(0, 10)}…
+                    </span>
+                  )}
+                </li>
+              ))
+            : selectedChains.map((chainId) => {
+                const t = targets.find((x) => x.wormholeChainId === chainId);
+                return t ? (
+                  <li key={chainId} className="flex items-center gap-2 text-gray-700">
+                    <span className="text-green-500">✓</span> {t.name}
+                  </li>
+                ) : null;
+              })}
         </ul>
         <button
           type="button"
@@ -95,16 +115,18 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
 
-      {/* ─── Phantom wallet connect ─────────────────────────────────────── */}
+      {/* ─── Wallet connect ─────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4">
         <div>
-          <p className="font-semibold text-purple-900 text-sm">Phantom Wallet</p>
+          <p className="font-semibold text-purple-900 text-sm">Solana Wallet</p>
           {connected && publicKey ? (
             <p className="text-xs font-mono text-purple-700 break-all mt-0.5">
               {publicKey.toBase58().slice(0, 4)}…{publicKey.toBase58().slice(-4)}
             </p>
           ) : (
-            <p className="text-xs text-purple-600 mt-0.5">Connect to sign the burn transaction</p>
+            <p className="text-xs text-purple-600 mt-0.5">
+              Phantom · Solflare · Coinbase Wallet
+            </p>
           )}
         </div>
         <WalletMultiButton
@@ -127,6 +149,21 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
           Wormhole relays the burn proof — no trusted intermediary.
           More you burn, more chains you unlock.
         </p>
+      </div>
+
+      {/* ─── SPL token mint ────────────────────────────────────────────── */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          SPL Token Mint Address
+          <span className="ml-2 text-xs text-gray-400">(the token you want to burn)</span>
+        </label>
+        <input
+          type="text"
+          value={tokenMint}
+          onChange={(e) => setTokenMint(e.target.value.trim())}
+          placeholder="So1anaM1ntAddressXXXXXXXXXXXXXXXXXXXXXXXX"
+          className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+        />
       </div>
 
       {/* ─── Burn tiers ────────────────────────────────────────────────── */}
@@ -226,12 +263,14 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
       </div>
 
       {/* ─── Flow diagram ──────────────────────────────────────────────── */}
-      {selectedChains.length > 0 && evmRecipient && (
+      {selectedChains.length > 0 && evmRecipient && tokenMint && (
         <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600 space-y-1.5">
           <p className="font-semibold text-gray-700 text-sm">What will happen:</p>
           <ol className="list-decimal list-inside space-y-1">
-            <li>Phantom wallet signs the Solana transaction</li>
-            <li>Anchor program burns <strong>{burnAmount} SPL tokens</strong></li>
+            <li>Wallet signs the Solana burn transaction</li>
+            <li>Anchor program burns <strong>{burnAmount} SPL tokens</strong> from mint{" "}
+              <span className="font-mono">{tokenMint.slice(0, 6)}…{tokenMint.slice(-4)}</span>
+            </li>
             <li>Wormhole guardians sign the burn VAA (~13 s on mainnet)</li>
             <li>
               ERC20 tokens minted on:{" "}
@@ -268,13 +307,14 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
         disabled={
           !connected ||
           !tier ||
+          !tokenMint ||
           selectedChains.length === 0 ||
           !evmRecipient.match(/^0x[0-9a-fA-F]{40}$/) ||
           (state.step !== "idle" && state.step !== "error")
         }
         className="w-full rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white shadow hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 disabled:opacity-60 transition-colors"
       >
-        {!connected ? "Connect Phantom to continue" : "🔥 Burn & Activate Chains"}
+        {!connected ? "Connect wallet to continue" : "🔥 Burn & Activate Chains"}
       </button>
     </form>
   );
