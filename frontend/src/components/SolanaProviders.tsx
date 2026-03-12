@@ -1,17 +1,25 @@
 /**
- * SolanaProviders.tsx – Solana wallet-adapter providers for Phantom and other wallets.
+ * SolanaProviders.tsx – Solana wallet-adapter providers for multi-wallet support.
  *
  * Wraps children with:
  *   - ConnectionProvider  → manages the Solana RPC connection
  *   - WalletProvider      → manages wallet state (connected, publicKey, signTransaction…)
  *   - WalletModalProvider → renders the "select wallet" modal on demand
+ *
+ * Supported wallets: Phantom, Solflare, Backpack (xNFT), Coinbase Wallet
+ * The wallet-adapter auto-detects additional injected wallets via the
+ * Wallet Standard, so any compliant extension will appear automatically.
  */
 "use client";
 
 import { useMemo } from "react";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { PhantomWalletAdapter } from "@solana/wallet-adapter-wallets";
+import {
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+  CoinbaseWalletAdapter,
+} from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 
 // Import wallet adapter default styles (modal, button, etc.)
@@ -21,19 +29,34 @@ interface Props {
   children: React.ReactNode;
   /** Use devnet endpoint when true, mainnet-beta otherwise */
   isTestnet?: boolean;
+  /** Override the Solana RPC endpoint (falls back to public cluster URL) */
+  rpcEndpoint?: string;
 }
 
-export function SolanaProviders({ children, isTestnet = false }: Props) {
+export function SolanaProviders({ children, isTestnet = false, rpcEndpoint }: Props) {
   const endpoint = useMemo(
-    () => clusterApiUrl(isTestnet ? "devnet" : "mainnet-beta"),
-    [isTestnet]
+    () =>
+      rpcEndpoint ??
+      (process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
+        clusterApiUrl(isTestnet ? "devnet" : "mainnet-beta")),
+    [isTestnet, rpcEndpoint]
   );
 
-  const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
+  // Register all supported wallet adapters.
+  // Any wallet implementing the Wallet Standard is auto-detected in addition.
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter(),
+      new CoinbaseWalletAdapter(),
+    ],
+    []
+  );
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets}>
+      {/* autoConnect: restores the last connected wallet on page reload */}
+      <WalletProvider wallets={wallets} autoConnect>
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
