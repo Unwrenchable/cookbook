@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title TokenFactory
@@ -10,7 +11,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
  *         One factory is deployed per chain; users call createToken() and never need to trust the deployer
  *         with private keys.
  */
-contract TokenFactory is Ownable {
+contract TokenFactory is Ownable, ReentrancyGuard {
     using Clones for address;
 
     // ─── Token flavors ────────────────────────────────────────────────────────
@@ -46,8 +47,13 @@ contract TokenFactory is Ownable {
     }
 
     // ─── Platform fee ─────────────────────────────────────────────────────────
-    uint256 public launchFee;          // in wei (native token)
+    uint256 public launchFee;          // minimum flat fee in wei (native token)
     address public feeRecipient;
+
+    // ─── v2: percentage-based fee + referral ──────────────────────────────────
+    uint16 public launchFeeBps;        // 50 = 0.5 % of msg.value (applied when > flat fee)
+    uint16 public referralShareBps;    // 2000 = 20 % of the collected fee goes to referrer
+    mapping(address => uint256) public referralEarnings;
 
     // ─── Template implementations ─────────────────────────────────────────────
     address public standardImpl;
@@ -76,6 +82,9 @@ contract TokenFactory is Ownable {
     event ImplementationUpdated(TokenFlavor indexed flavor, address impl);
     event LaunchFeeUpdated(uint256 newFee);
     event FeeRecipientUpdated(address newRecipient);
+    event LaunchFeeBpsUpdated(uint16 newBps);
+    event ReferralShareBpsUpdated(uint16 newBps);
+    event ReferralEarned(address indexed referrer, address indexed user, uint256 amount);
 
     // ─── Constructor ──────────────────────────────────────────────────────────
     constructor(
@@ -113,6 +122,8 @@ contract TokenFactory is Ownable {
         pumpMigrateImpl   = _pumpMigrateImpl;
         launchFee         = _launchFee;
         feeRecipient      = _feeRecipient;
+        launchFeeBps      = 50;
+        referralShareBps  = 2000;
     }
 
     // ─── Core: create token ───────────────────────────────────────────────────
@@ -124,58 +135,20 @@ contract TokenFactory is Ownable {
     function createToken(TokenParams calldata params)
         external
         payable
+        nonReentrant
         returns (address tokenAddress)
     {
+        // launchFee is the flat minimum. Effective fee = max(launchFee, msg.value × launchFeeBps / 10000).
+        // Any ETH above the effective fee is returned to the caller.
         require(msg.value >= launchFee, "TokenFactory: insufficient launch fee");
-        require(bytes(params.name).length > 0,   "TokenFactory: empty name");
-        require(bytes(params.symbol).length > 0,  "TokenFactory: empty symbol");
-        require(params.totalSupply > 0,           "TokenFactory: zero supply");
-        require(params.owner != address(0),        "TokenFactory: zero owner");
-        require(
-            uint8(params.flavor) <= uint8(TokenFlavor.PumpMigrate),
-            "TokenFactory: unknown flavor"
-        );
-        require(
-            uint256(params.buyTaxBps)       +
-            uint256(params.sellTaxBps)      +
-            uint256(params.burnBps)         +
-            uint256(params.reflectionBps)   <= 3000,
-            "TokenFactory: total fees exceed 30 %"
-        );
+        _validateParams(params);
 
-        // Pick the right implementation
         address impl = _implFor(params.flavor);
+        tokenAddress = _cloneAndInit(impl, params);
 
-        // Clone and initialise
-        tokenAddress = impl.clone();
-
-        (bool success, ) = tokenAddress.call(
-            abi.encodeWithSignature(
-                "initialize(string,string,uint256,uint8,uint16,uint16,uint16,uint16,address,uint16,address)",
-                params.name,
-                params.symbol,
-                params.totalSupply,
-                params.decimals == 0 ? 18 : params.decimals,
-                params.buyTaxBps,
-                params.sellTaxBps,
-                params.burnBps,
-                params.reflectionBps,
-                params.marketingWallet,
-                params.liquidityBps,
-                params.owner
-            )
-        );
-        require(success, "TokenFactory: initialization failed");
-
-        // Track deployment
-        tokensByOwner[params.owner].push(tokenAddress);
-        allTokens.push(tokenAddress);
-
-        // Forward fee
-        if (launchFee > 0 && msg.value > 0) {
-            (bool sent, ) = feeRecipient.call{value: msg.value}("");
-            require(sent, "TokenFactory: fee transfer failed");
-        }
+        uint256 fee = _computeFee(msg.value);
+        _returnExcess(fee);
+        _forwardFee(fee);
 
         emit TokenCreated(
             tokenAddress,
@@ -185,6 +158,59 @@ contract TokenFactory is Ownable {
             params.symbol,
             params.totalSupply
         );
+    }
+
+    /**
+     * @notice Deploy a new token and credit a referrer with a share of the fee.
+     * @param params   Token configuration.
+     * @param referrer Address to credit with referral earnings (use address(0) for none).
+     * @return tokenAddress Address of the newly deployed token.
+     */
+    function createTokenWithReferral(TokenParams calldata params, address referrer)
+        external
+        payable
+        nonReentrant
+        returns (address tokenAddress)
+    {
+        // Same fee model as createToken: max(launchFee, msg.value × launchFeeBps / 10000).
+        require(msg.value >= launchFee, "TokenFactory: insufficient launch fee");
+        _validateParams(params);
+
+        address impl = _implFor(params.flavor);
+        tokenAddress = _cloneAndInit(impl, params);
+
+        uint256 fee = _computeFee(msg.value);
+        _returnExcess(fee);
+
+        // Split referral
+        if (referrer != address(0) && referrer != msg.sender && referralShareBps > 0 && fee > 0) {
+            uint256 referralAmt = (fee * referralShareBps) / 10_000;
+            referralEarnings[referrer] += referralAmt;
+            fee -= referralAmt;
+            emit ReferralEarned(referrer, msg.sender, referralAmt);
+        }
+
+        _forwardFee(fee);
+
+        emit TokenCreated(
+            tokenAddress,
+            params.owner,
+            params.flavor,
+            params.name,
+            params.symbol,
+            params.totalSupply
+        );
+    }
+
+    /**
+     * @notice Referrers call this to withdraw their accumulated earnings.
+     */
+    function claimReferralEarnings() external nonReentrant {
+        uint256 amount = referralEarnings[msg.sender];
+        require(amount > 0, "TokenFactory: nothing to claim");
+        referralEarnings[msg.sender] = 0;
+        (bool ok, ) = msg.sender.call{value: amount}("");
+        require(ok, "TokenFactory: claim transfer failed");
     }
 
     // ─── Views ────────────────────────────────────────────────────────────────
@@ -226,7 +252,87 @@ contract TokenFactory is Ownable {
         emit FeeRecipientUpdated(_recipient);
     }
 
+    function setLaunchFeeBps(uint16 _bps) external onlyOwner {
+        require(_bps <= 1000, "TokenFactory: bps too high");
+        launchFeeBps = _bps;
+        emit LaunchFeeBpsUpdated(_bps);
+    }
+
+    function setReferralShareBps(uint16 _bps) external onlyOwner {
+        require(_bps <= 5000, "TokenFactory: referral share too high");
+        referralShareBps = _bps;
+        emit ReferralShareBpsUpdated(_bps);
+    }
+
     // ─── Internal ─────────────────────────────────────────────────────────────
+    function _validateParams(TokenParams calldata params) internal pure {
+        require(bytes(params.name).length > 0,   "TokenFactory: empty name");
+        require(bytes(params.symbol).length > 0,  "TokenFactory: empty symbol");
+        require(params.totalSupply > 0,           "TokenFactory: zero supply");
+        require(params.owner != address(0),        "TokenFactory: zero owner");
+        require(
+            uint8(params.flavor) <= uint8(TokenFlavor.PumpMigrate),
+            "TokenFactory: unknown flavor"
+        );
+        require(
+            uint256(params.buyTaxBps)     +
+            uint256(params.sellTaxBps)    +
+            uint256(params.burnBps)       +
+            uint256(params.reflectionBps) <= 3000,
+            "TokenFactory: total fees exceed 30 %"
+        );
+    }
+
+    function _cloneAndInit(address impl, TokenParams calldata params) internal returns (address tokenAddress) {
+        tokenAddress = impl.clone();
+        (bool success, ) = tokenAddress.call(
+            abi.encodeWithSignature(
+                "initialize(string,string,uint256,uint8,uint16,uint16,uint16,uint16,address,uint16,address)",
+                params.name,
+                params.symbol,
+                params.totalSupply,
+                params.decimals == 0 ? 18 : params.decimals,
+                params.buyTaxBps,
+                params.sellTaxBps,
+                params.burnBps,
+                params.reflectionBps,
+                params.marketingWallet,
+                params.liquidityBps,
+                params.owner
+            )
+        );
+        require(success, "TokenFactory: initialization failed");
+        tokensByOwner[params.owner].push(tokenAddress);
+        allTokens.push(tokenAddress);
+    }
+
+    /// @dev Compute the fee to collect: max(flatFee, pctFee), capped at msg.value.
+    function _computeFee(uint256 value) internal view returns (uint256 fee) {
+        fee = launchFee;
+        if (launchFeeBps > 0) {
+            uint256 pctFee = (value * launchFeeBps) / 10_000;
+            if (pctFee > fee) fee = pctFee;
+        }
+        if (fee > value) fee = value;
+    }
+
+    /// @dev Return any ETH above the fee to the caller.
+    function _returnExcess(uint256 fee) internal {
+        uint256 excess = msg.value - fee;
+        if (excess > 0) {
+            (bool ok, ) = msg.sender.call{value: excess}("");
+            require(ok, "TokenFactory: ETH return failed");
+        }
+    }
+
+    /// @dev Forward fee to feeRecipient.
+    function _forwardFee(uint256 fee) internal {
+        if (fee > 0) {
+            (bool sent, ) = feeRecipient.call{value: fee}("");
+            require(sent, "TokenFactory: fee transfer failed");
+        }
+    }
+
     function _implFor(TokenFlavor flavor) internal view returns (address) {
         if (flavor == TokenFlavor.Standard)      return standardImpl;
         if (flavor == TokenFlavor.Taxable)        return taxableImpl;

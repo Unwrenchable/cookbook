@@ -42,14 +42,14 @@ A dark, beautiful, production-ready degen launchpad supporting testnets and main
 - 📋 "My Tokens" dashboard — every token you've deployed on the current chain
 - 🛡️ Factory is immutable; users never trust us with private keys
 
-### v2 (planned)
-- 0.5% launch fee (collected in native token)
-- IPFS logo + metadata upload
-- Auto-listing stubs for DexTools / CoinMarketCap
-- Basic audit report (Slither + checklist)
-- Native on-chain DEX swap (direct router integration)
-- Referral system
-- AI token description generator
+### v2 (shipped)
+- ✅ 0.5% percentage-based launch fee (collected in native token, max of flat/pct)
+- ✅ Referral system — 20% of fee to referrer, claimable on-chain
+- ✅ IPFS logo + metadata upload via Pinata
+- ✅ Auto-listing stubs for DexTools / CoinMarketCap / CoinGecko
+- ✅ Basic audit report (Slither guidance + security checklist)
+- ✅ Native on-chain DEX swap (Uniswap V2 router integration)
+- ✅ AI token description generator (gpt-4o-mini, falls back to templates)
 
 ---
 

@@ -14,11 +14,12 @@ import { SolanaLaunchPanel } from "@/components/SolanaLaunchPanel";
 import { VanityAddressGenerator } from "@/components/VanityAddressGenerator";
 import { LPLockerPanel } from "@/components/LPLockerPanel";
 import { SwapWidget } from "@/components/SwapWidget";
+import { ReferralPanel } from "@/components/ReferralPanel";
 import { useDeployToken } from "@/hooks/useDeployToken";
 import { getChainById } from "@/lib/chains";
 import type { TokenFormData } from "@/lib/types";
 
-type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "vanity" | "dashboard";
+type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "vanity" | "dashboard" | "referral";
 
 export default function HomePage() {
   const { isConnected } = useAccount();
@@ -29,8 +30,10 @@ export default function HomePage() {
 
   const [activeTab,  setActiveTab]  = useState<Tab>("evm");
   const [isTestnet,  setIsTestnet]  = useState(false);
+  const [lastFormData, setLastFormData] = useState<TokenFormData | null>(null);
 
   async function handleDeploy(formData: TokenFormData) {
+    setLastFormData(formData);
     try {
       await deploy(formData);
     } catch {
@@ -45,6 +48,7 @@ export default function HomePage() {
     { id: "swap",          label: "💱 Swap"                },
     { id: "vanity",        label: "🔮 Vanity Address"      },
     { id: "dashboard",     label: "📋 My Tokens"           },
+    { id: "referral",      label: "🤝 Referral"            },
   ];
 
   return (
@@ -165,6 +169,10 @@ export default function HomePage() {
                   result={deployResult}
                   chainId={chainId}
                   onReset={() => window.location.reload()}
+                  tokenName={lastFormData?.name}
+                  tokenSymbol={lastFormData?.symbol}
+                  ownerAddress={lastFormData?.marketingWallet || ""}
+                  flavor={lastFormData?.flavor ?? 0}
                 />
               ) : (
                 <Card>
@@ -294,6 +302,29 @@ export default function HomePage() {
           <div className="space-y-4">
             <SectionTitle>My Deployed Tokens</SectionTitle>
             <TokenDashboard />
+          </div>
+        )}
+
+        {/* ── Referral ────────────────────────────────────────────────────── */}
+        {activeTab === "referral" && (
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="space-y-4">
+              <SectionTitle>Earn Referral Fees</SectionTitle>
+              <Card className="text-sm text-gray-400 space-y-3">
+                <Step n={1} text="Copy your unique referral link below" />
+                <Step n={2} text="Share it with degens who want to launch tokens" />
+                <Step n={3} text="Earn 20% of their launch fee automatically on-chain" />
+                <Step n={4} text="Claim your earnings any time — no expiry" />
+                <div className="rounded-lg bg-brand-500/10 border border-brand-500/30 p-3 text-xs text-brand-300">
+                  <strong>Passive income.</strong> Every token launched via your link puts ETH in your wallet.
+                </div>
+              </Card>
+            </div>
+            <div className="lg:col-span-2">
+              <Card>
+                <ReferralPanel />
+              </Card>
+            </div>
           </div>
         )}
       </main>

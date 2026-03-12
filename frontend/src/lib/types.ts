@@ -49,6 +49,7 @@ export interface TokenFormData {
   totalSupply:     number;
   decimals:        number;
   flavor:          TokenFlavor;
+  description:     string;
   // Tax (Taxable flavor)
   buyTaxBps:       number;   // basis points, 100 = 1 %
   sellTaxBps:      number;
@@ -79,6 +80,7 @@ export const DEFAULT_FORM_DATA: TokenFormData = {
   totalSupply:            1_000_000,
   decimals:               18,
   flavor:                 TokenFlavor.Standard,
+  description:            "",
   buyTaxBps:              0,
   sellTaxBps:             0,
   marketingWallet:        "",
