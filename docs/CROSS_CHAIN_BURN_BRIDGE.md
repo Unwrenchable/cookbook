@@ -9,6 +9,16 @@ This creates a unique multi-chain token economics model where:
 - Burns are the **cross-chain activation cost** (creates scarcity + activates reach)
 - Wormhole is the **trustless relay** (no custodian)
 
+> ⚠️ **Production Readiness Status**
+>
+> The Solana Anchor program emits a `BurnMessageEmitted` event but does **not yet CPI into the Wormhole `post_message` instruction**. On the EVM side, `BurnBridgeReceiver.receiveMessage()` currently **reverts** — it is a scaffold pending full Wormhole VAA integration.
+>
+> For development and integration testing, use `BurnBridgeReceiver.receiveRelayedMessage()` together with a trusted off-chain relayer that decodes the Anchor event and submits the payload + replay key.
+>
+> To complete the production bridge, two tasks remain:
+> 1. Add the Wormhole `post_message` CPI call to the Anchor program's `burn_and_bridge` instruction.
+> 2. Uncomment and test the `IWormhole.parseAndVerifyVM()` code path in `BurnBridgeReceiver.receiveMessage()`.
+
 ---
 
 ## The Flow (step by step)

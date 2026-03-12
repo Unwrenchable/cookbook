@@ -1,6 +1,6 @@
 # GOONFORGE Deployment Walkthrough
 
-This guide takes you from a fresh clone to a fully live GOONFORGE deployment on any supported EVM chain.
+This guide takes you from a fresh clone to a fully live GOONFORGE deployment on Vercel (frontend) and any supported EVM chain (smart contracts).
 
 ---
 
@@ -13,7 +13,7 @@ This guide takes you from a fresh clone to a fully live GOONFORGE deployment on 
 5. [Deploy to Testnet](#5-deploy-to-testnet)
 6. [Verify Contracts on Etherscan](#6-verify-contracts-on-etherscan)
 7. [Set Up Frontend Environment Variables](#7-set-up-frontend-environment-variables)
-8. [Run the Frontend](#8-run-the-frontend)
+8. [Deploy Frontend to Vercel](#8-deploy-frontend-to-vercel)
 9. [Deploy to Mainnet](#9-deploy-to-mainnet)
 10. [Adding a New Chain](#10-adding-a-new-chain)
 11. [(Optional) Solana Cross-Chain Bridge](#11-optional-solana-cross-chain-bridge)
@@ -119,8 +119,8 @@ pnpm deploy:sepolia
 # BNB Smart Chain Testnet
 pnpm deploy:bscTestnet
 
-# Polygon Mumbai
-pnpm deploy:polygonMumbai
+# Polygon Amoy (replaces the deprecated Mumbai testnet)
+pnpm deploy:polygonAmoy
 
 # Arbitrum Sepolia
 pnpm deploy:arbitrumSepolia
@@ -193,7 +193,7 @@ npx hardhat verify --network sepolia 0xTAXABLE_IMPL
 # ... repeat for each implementation
 ```
 
-Replace `sepolia` with the target network name from `hardhat.config.ts` (e.g. `bscTestnet`, `polygonMumbai`, `arbitrumSepolia`, `baseSepolia`).
+Replace `sepolia` with the target network name from `hardhat.config.ts` (e.g. `bscTestnet`, `polygonAmoy`, `arbitrumSepolia`, `baseSepolia`).
 
 ---
 
@@ -204,7 +204,7 @@ cd ../../frontend
 cp .env.example .env.local
 ```
 
-Open `.env.local` and fill in your values:
+Open `.env.local` and fill in your values. Every variable is documented in `frontend/.env.example` — the key ones are:
 
 ```env
 # WalletConnect project ID (required for RainbowKit)
@@ -217,7 +217,7 @@ NEXT_PUBLIC_ALCHEMY_KEY=your_alchemy_api_key
 # Paste the tokenFactory address from each chain's deploy output
 NEXT_PUBLIC_FACTORY_SEPOLIA=0x...
 NEXT_PUBLIC_FACTORY_BSC_TESTNET=0x...
-NEXT_PUBLIC_FACTORY_POLYGON_MUMBAI=0x...
+NEXT_PUBLIC_FACTORY_POLYGON_AMOY=0x...
 NEXT_PUBLIC_FACTORY_ARB_SEPOLIA=0x...
 NEXT_PUBLIC_FACTORY_BASE_SEPOLIA=0x...
 NEXT_PUBLIC_FACTORY_MAINNET=0x...
@@ -230,12 +230,12 @@ NEXT_PUBLIC_FACTORY_AVALANCHE=0x...
 # ── LPLocker addresses ────────────────────────────────────────────────────────
 NEXT_PUBLIC_LOCKER_SEPOLIA=0x...
 NEXT_PUBLIC_LOCKER_BSC_TESTNET=0x...
-# ... (one per chain)
+# ... (one per chain — see frontend/.env.example for full list)
 
-# ── Optional: AI description generator (falls back to templates if empty) ─────
+# ── Optional: AI description generator (server-side) ─────────────────────────
 OPENAI_API_KEY=sk-...
 
-# ── Optional: IPFS / Pinata (shows a mock hash if empty) ─────────────────────
+# ── Optional: IPFS / Pinata (server-side) ────────────────────────────────────
 PINATA_JWT=...
 ```
 
@@ -243,30 +243,75 @@ PINATA_JWT=...
 
 ---
 
-## 8. Run the Frontend
+## 8. Deploy Frontend to Vercel
+
+The frontend is designed for **Vercel-only** hosting. A `vercel.json` at the repo root configures the monorepo build, security headers, CDN caching, and smart build-ignore rules automatically.
+
+### Option A — Vercel CLI (quickest for first-time setup)
 
 ```bash
-# From frontend/
-pnpm dev
-# → Open http://localhost:3000
-```
-
-To do a production build check before deploying:
-
-```bash
-pnpm build
-pnpm start
-```
-
-The app is a standard Next.js 15 project and can be deployed to **Vercel** (recommended), Netlify, or any Node.js host:
-
-```bash
-# Vercel (one-time setup)
+# Install the CLI once
 npm install -g vercel
+
+# From the repo root (vercel.json is here)
+vercel
+
+# Follow the prompts:
+#   → Link to your Vercel account / team
+#   → Set up and deploy? Yes
+#   → Which scope? (choose your account)
+#   → Link to existing project? No → new project name: goonforge
+#   → Project root directory? . (the repo root — vercel.json handles the build)
+#   → Override settings? No
+
+# After the preview deploy succeeds, promote to production:
 vercel --prod
 ```
 
-Set the same environment variables from `.env.local` in your Vercel project's **Settings → Environment Variables** dashboard.
+### Option B — Vercel Dashboard (recommended for CI/CD)
+
+1. Go to [vercel.com/new](https://vercel.com/new) → **Import Git Repository** → select `Unwrenchable/cookbook`.
+2. In **Configure Project**:
+   - **Framework preset**: Next.js (auto-detected)
+   - **Root Directory**: `.` (leave as repo root — `vercel.json` points the build at `frontend/`)
+   - **Build Command**: `pnpm turbo run build --filter=@tokenforge/frontend` *(pre-filled from `vercel.json`)*
+   - **Output Directory**: `frontend/.next` *(pre-filled from `vercel.json`)*
+   - **Install Command**: `pnpm install` *(pre-filled from `vercel.json`)*
+3. Click **Environment Variables** and add every key from `frontend/.env.example` (both `NEXT_PUBLIC_*` and server-only keys such as `OPENAI_API_KEY` and `PINATA_JWT`).
+4. Click **Deploy**.
+
+### Setting Environment Variables in Vercel
+
+In the Vercel dashboard go to **Project → Settings → Environment Variables**:
+
+| Variable | Scope | Description |
+|----------|-------|-------------|
+| `NEXT_PUBLIC_WC_PROJECT_ID` | All | WalletConnect project ID |
+| `NEXT_PUBLIC_ALCHEMY_KEY` | All | Alchemy API key |
+| `NEXT_PUBLIC_FACTORY_*` | All | Factory address per chain |
+| `NEXT_PUBLIC_LOCKER_*` | All | LPLocker address per chain |
+| `NEXT_PUBLIC_RECEIVER_*` | All | BurnBridgeReceiver address per chain |
+| `NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID` | All | Anchor program ID |
+| `OPENAI_API_KEY` | Production, Preview | AI description generator |
+| `PINATA_JWT` | Production, Preview | IPFS upload via Pinata |
+
+> **Tip:** Set `NEXT_PUBLIC_*` variables in **all three** environments (Production, Preview, Development) so every branch preview and local `vercel dev` works correctly. Set server-only keys (`OPENAI_API_KEY`, `PINATA_JWT`) in Production + Preview only.
+
+### Local development with Vercel environment
+
+After initial deployment, you can pull down your Vercel env vars for local development:
+
+```bash
+# Pull env vars from Vercel to .env.local
+vercel env pull frontend/.env.local
+cd frontend && pnpm dev
+```
+
+### Continuous deployment
+
+Every push to `main` triggers a production deployment automatically. Pull requests get preview URLs. No extra CI config is needed — Vercel handles it all.
+
+The `ignoreCommand` in `vercel.json` skips rebuilds when only `contracts/` or `docs/` change, keeping your deployment log clean.
 
 ---
 
@@ -288,14 +333,14 @@ pnpm deploy:avalanche      # Avalanche C-Chain
 > **Mainnet checklist before deploying:**
 > - [ ] All tests pass (`pnpm test`)
 > - [ ] Deployer wallet has enough native token for gas on each chain
-> - [ ] `feeRecipient` in `scripts/deploy.ts` is set to your treasury wallet (not the deployer key)
+> - [ ] `feeRecipient` in `scripts/deploy.ts` is set to your **treasury / multisig wallet** (not the deployer key — the default value is the deployer address, which means fees accumulate in the same hot wallet used for deployment)
 > - [ ] You've done a dry-run on testnet with the same parameters
 > - [ ] `.env` is not committed to git
 
 After each mainnet deploy:
-1. Copy the `tokenFactory` and `lpLocker` addresses into `frontend/.env.local` (and your Vercel env vars)
-2. Verify contracts on the respective block explorer (same `npx hardhat verify` command, with the mainnet network name)
-3. Re-deploy the frontend so the new addresses take effect
+1. Copy the `tokenFactory` and `lpLocker` addresses into your Vercel project's **Environment Variables** dashboard (and update `frontend/.env.local` for local dev).
+2. Verify contracts on the respective block explorer (same `npx hardhat verify` command, with the mainnet network name).
+3. Trigger a Vercel re-deploy so the new addresses take effect (push any change to `main`, or click **Redeploy** in the Vercel dashboard).
 
 ---
 
@@ -349,7 +394,7 @@ In `frontend/src/lib/chains.ts`, add a new entry to `SUPPORTED_CHAINS`:
 **Step 5 — Set the env var**
 
 ```env
-# In frontend/.env.local and your Vercel env vars
+# In Vercel Environment Variables dashboard (and frontend/.env.local for local dev)
 NEXT_PUBLIC_FACTORY_NEWCHAIN=0x...
 ```
 
@@ -361,6 +406,8 @@ Done — the UI detects the new chain immediately on next build.
 
 If you want to enable the **burn-to-activate** cross-chain mechanic (burn SPL tokens on Solana → mint ERC20 on EVM), follow the guide in [`docs/CROSS_CHAIN_BURN_BRIDGE.md`](./CROSS_CHAIN_BURN_BRIDGE.md).
 
+> ⚠️ **Scaffold status:** `BurnBridgeReceiver.receiveMessage()` currently reverts with a clear error message until the Wormhole VAA integration is complete. Development testing uses `receiveRelayedMessage()` with a trusted relayer. See the bridge guide for details.
+
 The short version:
 
 ```bash
@@ -369,13 +416,27 @@ cd contracts/solana
 anchor build
 anchor deploy --provider.cluster devnet
 
-# 2. Deploy BurnBridgeReceiver on each EVM chain
-cd ../evm
-npx hardhat run scripts/deployBridge.ts --network sepolia
+# 2. Set SOLANA_EMITTER in contracts/evm/.env (program ID as bytes32 hex)
+# 3. Set MINTABLE_TOKEN (the ERC20 that will be minted after bridge calls)
 
-# 3. Set env vars
+# 4. Deploy BurnBridgeReceiver on each EVM chain (testnets first)
+cd ../evm
+pnpm deploy:bridge:sepolia
+pnpm deploy:bridge:arbitrumSepolia
+pnpm deploy:bridge:baseSepolia
+
+# 5. Mainnet bridge deployment (after testnet verification)
+pnpm deploy:bridge:mainnet
+pnpm deploy:bridge:arbitrum
+pnpm deploy:bridge:base
+pnpm deploy:bridge:bsc
+pnpm deploy:bridge:polygon
+pnpm deploy:bridge:avalanche
+
+# 6. Set env vars in Vercel Environment Variables dashboard
 #    NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID=<from anchor deploy>
-#    NEXT_PUBLIC_RECEIVER_SEPOLIA=<from deployBridge output>
+#    NEXT_PUBLIC_RECEIVER_SEPOLIA=<from deploy:bridge:sepolia output>
+#    ... (one per chain)
 ```
 
 ---
@@ -389,8 +450,12 @@ npx hardhat run scripts/deployBridge.ts --network sepolia
 | `ProviderError: invalid API key` | Verify your `ALCHEMY_API_KEY` in `.env` |
 | Verification fails with `already verified` | Safe to ignore — contract is already verified |
 | Verification fails with `bytecode mismatch` | Recompile with `pnpm compile` then retry verification |
-| Frontend shows "Factory not deployed" | Fill in `NEXT_PUBLIC_FACTORY_<CHAIN>` in `.env.local` and restart the dev server |
-| `next build` fails | Run `pnpm install` in the `frontend/` folder and retry |
+| Frontend shows "Factory not deployed" | Fill in `NEXT_PUBLIC_FACTORY_<CHAIN>` in Vercel's Environment Variables and redeploy |
+| Vercel build fails with "turbo not found" | Ensure `vercel.json` `installCommand` is `pnpm install`; Vercel auto-installs turbo from `devDependencies` |
+| Vercel build ignores env var changes | In the dashboard go to **Deployments → Redeploy** (with "Use existing Build Cache" unchecked) |
+| `vercel env pull` fails | Run `vercel login` first; ensure you linked the project with `vercel link` |
+| OPENAI / PINATA not working on Vercel | These are server-only keys — add them **without** `NEXT_PUBLIC_` prefix in Vercel Environment Variables |
+| `next build` fails locally | Run `pnpm install` from the repo root and retry |
 
 ---
 

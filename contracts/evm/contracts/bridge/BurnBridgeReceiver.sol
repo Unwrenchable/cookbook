@@ -110,31 +110,48 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
     /**
      * @notice Submit a Wormhole VAA to activate (mint) tokens on this chain.
      *
-     * In development mode (before Wormhole is integrated), a trusted relayer
-     * can call `receiveRelayedMessage` instead with the raw decoded payload.
+     * ⚠️  NOT YET IMPLEMENTED — Wormhole VAA parsing is commented out pending
+     * dependency pinning.  This function reverts to prevent accidental use in
+     * production without on-chain verification.
+     *
+     * During development / integration testing use `receiveRelayedMessage`
+     * instead, which is protected by the trusted-relayer whitelist.
+     *
+     * Production implementation should:
+     *   1. Parse and verify: IWormhole(wormholeCore).parseAndVerifyVM(encodedVAA)
+     *   2. Validate emitter chain and address against SOLANA_CHAIN_ID /
+     *      trustedSolanaEmitter.
+     *   3. Use vm.emitterChainId + vm.emitterAddress + vm.sequence as
+     *      the replay-prevention key in processedMessages.
+     *   4. Call _processPayload(vm.payload).
      *
      * @param encodedVAA The full encoded Wormhole VAA bytes.
      */
     function receiveMessage(bytes calldata encodedVAA) external nonReentrant {
-        // ── 1. Parse and verify VAA ───────────────────────────────────────────
-        // TODO: uncomment once Wormhole interface is imported:
-        //
-        //   (IWormhole.VM memory vm, bool valid, string memory reason)
-        //       = IWormhole(wormholeCore).parseAndVerifyVM(encodedVAA);
-        //   require(valid, reason);
-        //   require(vm.emitterChainId == SOLANA_CHAIN_ID, "BurnBridgeReceiver: wrong emitter chain");
-        //   require(vm.emitterAddress == trustedSolanaEmitter, "BurnBridgeReceiver: untrusted emitter");
-        //
-        // ── 2. Replay protection ──────────────────────────────────────────────
-        //   bytes32 messageKey = keccak256(abi.encodePacked(vm.emitterChainId, vm.emitterAddress, vm.sequence));
-        //   require(!processedMessages[messageKey], "BurnBridgeReceiver: already processed");
-        //   processedMessages[messageKey] = true;
-        //
-        // ── 3. Decode payload and mint ────────────────────────────────────────
-        //   _processPayload(vm.payload);
+        // Wormhole VAA verification is not yet integrated.
+        // Calling this in its current unverified state would allow anyone to
+        // mint arbitrary tokens by submitting a crafted payload, so we revert
+        // explicitly until the integration is complete.
+        revert("BurnBridgeReceiver: Wormhole VAA verification not implemented; use receiveRelayedMessage");
 
-        // Scaffold: decode directly for integration testing
-        _processPayload(encodedVAA);
+        // ── Production implementation (uncomment & remove the revert above) ─────
+        //
+        // (IWormhole.VM memory vm, bool valid, string memory reason)
+        //     = IWormhole(wormholeCore).parseAndVerifyVM(encodedVAA);
+        // require(valid, reason);
+        // require(vm.emitterChainId == SOLANA_CHAIN_ID,    "BurnBridgeReceiver: wrong emitter chain");
+        // require(vm.emitterAddress == trustedSolanaEmitter, "BurnBridgeReceiver: untrusted emitter");
+        //
+        // bytes32 messageKey = keccak256(
+        //     abi.encodePacked(vm.emitterChainId, vm.emitterAddress, vm.sequence)
+        // );
+        // require(!processedMessages[messageKey], "BurnBridgeReceiver: already processed");
+        // processedMessages[messageKey] = true;
+        //
+        // _processPayload(vm.payload);
+        //
+        // Suppress unused-variable warning in scaffold build:
+        encodedVAA;
     }
 
     /**

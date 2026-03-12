@@ -61,7 +61,10 @@ async function main() {
 
   // 0.001 ETH launch fee (adjust per chain)
   const launchFee    = ethers.parseEther("0.001");
-  const feeRecipient = deployer.address; // replace with your treasury wallet
+  // ⚠️  Replace deployer.address with your treasury / multisig wallet before
+  // deploying to mainnet. Using the deployer key as the fee recipient means
+  // all fees accumulate in the same hot wallet used for deployment.
+  const feeRecipient = deployer.address; // TODO: replace with treasury wallet
 
   const TokenFactoryContract = await ethers.getContractFactory("TokenFactory");
   const factory = await TokenFactoryContract.deploy(

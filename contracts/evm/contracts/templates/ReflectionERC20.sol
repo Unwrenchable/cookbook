@@ -90,10 +90,16 @@ contract ReflectionERC20 is Initializable, ERC20Upgradeable, OwnableUpgradeable 
         }
         uint256 reflectAmount = (amount * reflectionBps) / 10_000;
         if (reflectAmount > 0 && totalSupply() > 0) {
-            // Distribute reflection to all holders via per-share accumulator
+            // Distribute reflection to all holders via per-share accumulator.
+            // Use totalSupply() before burning so the per-share increase is
+            // computed against the full outstanding supply.
             _reflectionsPerShare += (reflectAmount * _MAGNITUDE) / totalSupply();
+            // Burn the reflection amount from the sender so they pay the full
+            // `amount` (net transfer + reflection tax), and so that
+            // claimReflections() can re-mint without inflating supply.
+            super._update(from, address(0), reflectAmount);
         }
-        super._update(from, to, reflectAmount > 0 ? amount - reflectAmount : amount);
+        super._update(from, to, amount - reflectAmount);
         _syncDebt(from);
         _syncDebt(to);
     }
