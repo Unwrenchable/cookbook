@@ -5,14 +5,20 @@
 
 import type { DeployResult as DeployResultType } from "@/hooks/useDeployToken";
 import { getChainById } from "@/lib/chains";
+import { ListingHelper } from "@/components/ListingHelper";
+import { AuditReport } from "@/components/AuditReport";
 
 interface Props {
   result: DeployResultType;
   chainId: number;
   onReset: () => void;
+  tokenName?: string;
+  tokenSymbol?: string;
+  ownerAddress?: string;
+  flavor?: number;
 }
 
-export function DeployResult({ result, chainId, onReset }: Props) {
+export function DeployResult({ result, chainId, onReset, tokenName = "", tokenSymbol = "", ownerAddress = "", flavor = 0 }: Props) {
   const chain = getChainById(chainId);
   const explorerBase = chain?.blockExplorer ?? "";
 
@@ -78,6 +84,25 @@ export function DeployResult({ result, chainId, onReset }: Props) {
       >
         Launch another token
       </button>
+
+      {/* Listing helper */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+        <ListingHelper
+          tokenAddress={result.tokenAddress}
+          chainId={chainId}
+          tokenName={tokenName}
+          tokenSymbol={tokenSymbol}
+        />
+      </div>
+
+      {/* Audit report */}
+      <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-2">
+        <AuditReport
+          tokenAddress={result.tokenAddress}
+          ownerAddress={ownerAddress}
+          flavor={flavor}
+        />
+      </div>
     </div>
   );
 }

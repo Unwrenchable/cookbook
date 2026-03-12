@@ -55,6 +55,8 @@ export function TokenForm({
     flavor: initialFlavor ?? TokenFlavor.Standard,
   });
   const [showNarratives, setShowNarratives] = useState(true);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   function set<K extends keyof TokenFormData>(key: K, value: TokenFormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -63,6 +65,33 @@ export function TokenForm({
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     onSubmit(form);
+  }
+
+  async function handleAiGenerate() {
+    setAiLoading(true);
+    setAiError(null);
+    try {
+      const res = await fetch("/api/ai-describe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name || "Token",
+          symbol: form.symbol || "TKN",
+          flavor: TOKEN_FLAVOR_LABELS[form.flavor],
+          vibes: "degen meme crypto",
+        }),
+      });
+      const data = (await res.json()) as { description?: string; error?: string };
+      if (data.description) {
+        set("description", data.description);
+      } else {
+        setAiError(data.error ?? "No description returned");
+      }
+    } catch {
+      setAiError("Failed to generate description");
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   const isTaxable       = form.flavor === TokenFlavor.Taxable;
@@ -180,7 +209,42 @@ export function TokenForm({
             className={inputCls}
           />
         </Field>
+      </div>
 
+      {/* ─── AI Description ────────────────────────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm font-medium text-gray-700">
+            Description <span className="text-gray-400 font-normal">(optional, used for IPFS metadata)</span>
+          </label>
+          <button
+            type="button"
+            onClick={handleAiGenerate}
+            disabled={aiLoading}
+            className="flex items-center gap-1 rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-60 transition-colors"
+          >
+            {aiLoading ? (
+              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+            ) : (
+              "✨"
+            )}
+            AI Generate
+          </button>
+        </div>
+        <textarea
+          value={form.description}
+          onChange={(e) => set("description", e.target.value)}
+          rows={2}
+          placeholder="Token description (optional, used for IPFS metadata)"
+          className={`${inputCls} resize-none`}
+        />
+        {aiError && (
+          <p className="mt-1 text-xs text-red-500">{aiError}</p>
+        )}
+      </div>
+
+      {/* ─── Supply / Decimals ─────────────────────────────────────────────── */}
+      <div className="grid gap-4 sm:grid-cols-2">
         {!hasBondingCurve && (
           <Field label="Total Supply" required>
             <input

@@ -525,3 +525,268 @@ describe("LPLocker", function () {
     expect(await locker.totalLocks()).to.equal(1n);
   });
 });
+
+// ─── v2: Percentage-based launch fee (launchFeeBps) ──────────────────────────
+
+describe("Percentage-based launch fee (launchFeeBps)", function () {
+  let factory: TokenFactory;
+  let standardImpl: StandardERC20;
+  let taxableImpl: TaxableERC20;
+  let deflationaryImpl: DeflationaryERC20;
+  let reflectionImpl: ReflectionERC20;
+  let bondingCurveImpl: BondingCurveToken;
+  let aiAgentImpl: any;
+  let politiFiImpl: any;
+  let utilityHybridImpl: any;
+  let pumpMigrateImpl: any;
+  let owner: SignerWithAddress;
+  let user1: SignerWithAddress;
+  let feeRecipient: SignerWithAddress;
+
+  const LAUNCH_FEE = ethers.parseEther("0.001");
+
+  function defaultParams(overrides: { tokenOwner?: string } = {}) {
+    return {
+      name: "Test", symbol: "TST", totalSupply: ethers.parseUnits("1000000", 0),
+      decimals: 18, buyTaxBps: 0, sellTaxBps: 0, burnBps: 0, reflectionBps: 0,
+      marketingWallet: ethers.ZeroAddress, liquidityBps: 0,
+      owner: overrides.tokenOwner ?? user1.address,
+      flavor: TokenFlavor.Standard,
+    };
+  }
+
+  beforeEach(async function () {
+    [owner, user1, , feeRecipient] = await ethers.getSigners();
+
+    const StdFactory = await ethers.getContractFactory("StandardERC20");
+    standardImpl = await StdFactory.deploy();
+    await standardImpl.waitForDeployment();
+
+    const TaxFactory = await ethers.getContractFactory("TaxableERC20");
+    taxableImpl = await TaxFactory.deploy();
+    await taxableImpl.waitForDeployment();
+
+    const DefFactory = await ethers.getContractFactory("DeflationaryERC20");
+    deflationaryImpl = await DefFactory.deploy();
+    await deflationaryImpl.waitForDeployment();
+
+    const RefFactory = await ethers.getContractFactory("ReflectionERC20");
+    reflectionImpl = await RefFactory.deploy();
+    await reflectionImpl.waitForDeployment();
+
+    const BcFactory = await ethers.getContractFactory("BondingCurveToken");
+    bondingCurveImpl = await BcFactory.deploy();
+    await bondingCurveImpl.waitForDeployment();
+
+    const AIFactory = await ethers.getContractFactory("AIAgentToken");
+    aiAgentImpl = await AIFactory.deploy();
+    await aiAgentImpl.waitForDeployment();
+
+    const PoliFactory = await ethers.getContractFactory("PolitiFiToken");
+    politiFiImpl = await PoliFactory.deploy();
+    await politiFiImpl.waitForDeployment();
+
+    const UHFactory = await ethers.getContractFactory("UtilityHybridToken");
+    utilityHybridImpl = await UHFactory.deploy();
+    await utilityHybridImpl.waitForDeployment();
+
+    const PMFactory = await ethers.getContractFactory("PumpMigrateToken");
+    pumpMigrateImpl = await PMFactory.deploy();
+    await pumpMigrateImpl.waitForDeployment();
+
+    const FactoryContract = await ethers.getContractFactory("TokenFactory");
+    factory = await FactoryContract.deploy(
+      await standardImpl.getAddress(), await taxableImpl.getAddress(),
+      await deflationaryImpl.getAddress(), await reflectionImpl.getAddress(),
+      await bondingCurveImpl.getAddress(), await aiAgentImpl.getAddress(),
+      await politiFiImpl.getAddress(), await utilityHybridImpl.getAddress(),
+      await pumpMigrateImpl.getAddress(), LAUNCH_FEE, feeRecipient.address
+    );
+    await factory.waitForDeployment();
+  });
+
+  it("launchFeeBps defaults to 50", async function () {
+    expect(await factory.launchFeeBps()).to.equal(50n);
+  });
+
+  it("percentage fee kicks in when msg.value exceeds breakeven", async function () {
+    // Send 10 ETH — pct fee = 10 * 50/10000 = 0.05 ETH, which is > flat 0.001 ETH
+    const sendValue = ethers.parseEther("10");
+    const expectedFee = (sendValue * 50n) / 10_000n; // 0.05 ETH
+
+    const feeRecipientBefore = await ethers.provider.getBalance(feeRecipient.address);
+    const user1Before = await ethers.provider.getBalance(user1.address);
+
+    const tx = await factory.connect(user1).createToken(defaultParams(), { value: sendValue });
+    const receipt = await tx.wait();
+    const gasUsed = receipt!.gasUsed * receipt!.gasPrice;
+
+    const feeRecipientAfter = await ethers.provider.getBalance(feeRecipient.address);
+    const user1After = await ethers.provider.getBalance(user1.address);
+
+    // feeRecipient should have received exactly 0.05 ETH
+    expect(feeRecipientAfter - feeRecipientBefore).to.equal(expectedFee);
+
+    // user1 net spend = fee + gas (excess returned)
+    const netSpend = user1Before - user1After;
+    expect(netSpend).to.be.closeTo(expectedFee + gasUsed, ethers.parseEther("0.001"));
+  });
+
+  it("flat minimum fee still applies for small amounts", async function () {
+    // Send exactly LAUNCH_FEE (0.001 ETH). pct fee = 0.000005 ETH < flat → flat wins.
+    const feeRecipientBefore = await ethers.provider.getBalance(feeRecipient.address);
+    await factory.connect(user1).createToken(defaultParams(), { value: LAUNCH_FEE });
+    const feeRecipientAfter = await ethers.provider.getBalance(feeRecipient.address);
+
+    expect(feeRecipientAfter - feeRecipientBefore).to.equal(LAUNCH_FEE);
+  });
+});
+
+// ─── v2: Referral system ──────────────────────────────────────────────────────
+
+describe("Referral system", function () {
+  let factory: TokenFactory;
+  let standardImpl: StandardERC20;
+  let taxableImpl: TaxableERC20;
+  let deflationaryImpl: DeflationaryERC20;
+  let reflectionImpl: ReflectionERC20;
+  let bondingCurveImpl: BondingCurveToken;
+  let aiAgentImpl: any;
+  let politiFiImpl: any;
+  let utilityHybridImpl: any;
+  let pumpMigrateImpl: any;
+  let owner: SignerWithAddress;
+  let user1: SignerWithAddress;
+  let user2: SignerWithAddress;
+  let feeRecipient: SignerWithAddress;
+
+  const LAUNCH_FEE = ethers.parseEther("0.001");
+
+  function defaultParams(overrides: { tokenOwner?: string } = {}) {
+    return {
+      name: "RefTest", symbol: "REFT", totalSupply: ethers.parseUnits("1000000", 0),
+      decimals: 18, buyTaxBps: 0, sellTaxBps: 0, burnBps: 0, reflectionBps: 0,
+      marketingWallet: ethers.ZeroAddress, liquidityBps: 0,
+      owner: overrides.tokenOwner ?? user1.address,
+      flavor: TokenFlavor.Standard,
+    };
+  }
+
+  beforeEach(async function () {
+    [owner, user1, user2, feeRecipient] = await ethers.getSigners();
+
+    const StdFactory = await ethers.getContractFactory("StandardERC20");
+    standardImpl = await StdFactory.deploy();
+    await standardImpl.waitForDeployment();
+
+    const TaxFactory = await ethers.getContractFactory("TaxableERC20");
+    taxableImpl = await TaxFactory.deploy();
+    await taxableImpl.waitForDeployment();
+
+    const DefFactory = await ethers.getContractFactory("DeflationaryERC20");
+    deflationaryImpl = await DefFactory.deploy();
+    await deflationaryImpl.waitForDeployment();
+
+    const RefFactory = await ethers.getContractFactory("ReflectionERC20");
+    reflectionImpl = await RefFactory.deploy();
+    await reflectionImpl.waitForDeployment();
+
+    const BcFactory = await ethers.getContractFactory("BondingCurveToken");
+    bondingCurveImpl = await BcFactory.deploy();
+    await bondingCurveImpl.waitForDeployment();
+
+    const AIFactory = await ethers.getContractFactory("AIAgentToken");
+    aiAgentImpl = await AIFactory.deploy();
+    await aiAgentImpl.waitForDeployment();
+
+    const PoliFactory = await ethers.getContractFactory("PolitiFiToken");
+    politiFiImpl = await PoliFactory.deploy();
+    await politiFiImpl.waitForDeployment();
+
+    const UHFactory = await ethers.getContractFactory("UtilityHybridToken");
+    utilityHybridImpl = await UHFactory.deploy();
+    await utilityHybridImpl.waitForDeployment();
+
+    const PMFactory = await ethers.getContractFactory("PumpMigrateToken");
+    pumpMigrateImpl = await PMFactory.deploy();
+    await pumpMigrateImpl.waitForDeployment();
+
+    const FactoryContract = await ethers.getContractFactory("TokenFactory");
+    factory = await FactoryContract.deploy(
+      await standardImpl.getAddress(), await taxableImpl.getAddress(),
+      await deflationaryImpl.getAddress(), await reflectionImpl.getAddress(),
+      await bondingCurveImpl.getAddress(), await aiAgentImpl.getAddress(),
+      await politiFiImpl.getAddress(), await utilityHybridImpl.getAddress(),
+      await pumpMigrateImpl.getAddress(), LAUNCH_FEE, feeRecipient.address
+    );
+    await factory.waitForDeployment();
+  });
+
+  it("createTokenWithReferral splits fee with referrer", async function () {
+    // Send 1 ETH: fee = 1 ETH * 50/10000 = 0.005 ETH
+    // Referral (20%) = 0.001 ETH to user2
+    // feeRecipient gets 0.004 ETH
+    const sendValue = ethers.parseEther("1");
+    const expectedFee = (sendValue * 50n) / 10_000n; // 0.005 ETH
+    const expectedReferral = (expectedFee * 2000n) / 10_000n; // 0.001 ETH
+    const expectedToRecipient = expectedFee - expectedReferral; // 0.004 ETH
+
+    const feeRecipientBefore = await ethers.provider.getBalance(feeRecipient.address);
+
+    const tx = await factory.connect(user1).createTokenWithReferral(
+      defaultParams(), user2.address, { value: sendValue }
+    );
+    await expect(tx).to.emit(factory, "ReferralEarned")
+      .withArgs(user2.address, user1.address, expectedReferral);
+
+    const feeRecipientAfter = await ethers.provider.getBalance(feeRecipient.address);
+    expect(feeRecipientAfter - feeRecipientBefore).to.equal(expectedToRecipient);
+
+    // Referral earnings tracked on-chain
+    expect(await factory.referralEarnings(user2.address)).to.equal(expectedReferral);
+  });
+
+  it("claimReferralEarnings pays out to referrer", async function () {
+    const sendValue = ethers.parseEther("1");
+    const expectedFee = (sendValue * 50n) / 10_000n;
+    const expectedReferral = (expectedFee * 2000n) / 10_000n;
+
+    await factory.connect(user1).createTokenWithReferral(
+      defaultParams(), user2.address, { value: sendValue }
+    );
+
+    const user2Before = await ethers.provider.getBalance(user2.address);
+    const claimTx = await factory.connect(user2).claimReferralEarnings();
+    const claimReceipt = await claimTx.wait();
+    const gasUsed = claimReceipt!.gasUsed * claimReceipt!.gasPrice;
+    const user2After = await ethers.provider.getBalance(user2.address);
+
+    expect(user2After - user2Before + gasUsed).to.equal(expectedReferral);
+    expect(await factory.referralEarnings(user2.address)).to.equal(0n);
+  });
+
+  it("owner can set launchFeeBps", async function () {
+    await expect(factory.connect(owner).setLaunchFeeBps(100))
+      .to.emit(factory, "LaunchFeeBpsUpdated").withArgs(100);
+    expect(await factory.launchFeeBps()).to.equal(100n);
+
+    // Non-owner cannot set
+    await expect(factory.connect(user1).setLaunchFeeBps(10))
+      .to.be.reverted;
+  });
+
+  it("setLaunchFeeBps reverts when bps > 1000", async function () {
+    await expect(factory.connect(owner).setLaunchFeeBps(1001))
+      .to.be.revertedWith("TokenFactory: bps too high");
+  });
+
+  it("owner can set referralShareBps", async function () {
+    await expect(factory.connect(owner).setReferralShareBps(3000))
+      .to.emit(factory, "ReferralShareBpsUpdated").withArgs(3000);
+    expect(await factory.referralShareBps()).to.equal(3000n);
+
+    // Non-owner cannot set
+    await expect(factory.connect(user1).setReferralShareBps(100))
+      .to.be.reverted;
+  });
+});
