@@ -8,13 +8,13 @@
  *  4. Monitor for the Wormhole VAA to be signed by guardians.
  *  5. Submit the VAA to BurnBridgeReceiver.sol on the selected EVM chain(s).
  *
- * @dev This hook requires `@solana/wallet-adapter-react` and `@coral-xyz/anchor`.
- *      The Anchor program interaction is scaffolded here; full SDK integration
- *      requires `anchor build` to generate the IDL and TypeScript bindings.
+ * Requires Phantom (or any Solana wallet) connected via @solana/wallet-adapter-react.
  */
 "use client";
 
 import { useState, useCallback } from "react";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
+import { Transaction } from "@solana/web3.js";
 import { BURN_TIERS, getBurnTier, CROSS_CHAIN_TARGETS, WORMHOLE_API } from "@/lib/crossChain";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,6 +57,9 @@ export interface SolanaLaunchState {
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useSolanaLaunch() {
+  const { publicKey, connected, sendTransaction } = useWallet();
+  const { connection } = useConnection();
+
   const [state, setState] = useState<SolanaLaunchState>({
     step:     "idle",
     txHash:   null,
@@ -65,12 +68,10 @@ export function useSolanaLaunch() {
     burnTier: null,
   });
 
-  const setStep  = (step: SolanaLaunchStep) => setState((s) => ({ ...s, step }));
-  const setError = (error: Error)           => setState((s) => ({ ...s, step: "error", error }));
-
   // ─── Validate params ──────────────────────────────────────────────────────
 
   function validate(params: SolanaLaunchParams): string | null {
+    if (!connected || !publicKey)        return "Connect your Phantom wallet first";
     if (params.burnAmount <= 0)          return "Burn amount must be positive";
     if (!getBurnTier(params.burnAmount)) return "Burn amount too small (minimum 100 tokens)";
     if (!params.evmRecipient.match(/^0x[0-9a-fA-F]{40}$/)) return "Invalid EVM recipient address";
@@ -83,7 +84,7 @@ export function useSolanaLaunch() {
   const launch = useCallback(async (params: SolanaLaunchParams): Promise<void> => {
     const validationError = validate(params);
     if (validationError) {
-      setError(new Error(validationError));
+      setState((s) => ({ ...s, step: "error", error: new Error(validationError) }));
       return;
     }
 
@@ -93,7 +94,7 @@ export function useSolanaLaunch() {
     try {
       // ── Step 1: Burn + Bridge on Solana ────────────────────────────────────
       //
-      // Full integration (requires @coral-xyz/anchor + wallet adapter):
+      // Full Anchor integration (requires anchor build to generate IDL):
       //
       //   const provider = new AnchorProvider(connection, wallet, {});
       //   const program  = new Program(IDL, PROGRAM_ID, provider);
@@ -107,20 +108,27 @@ export function useSolanaLaunch() {
       //     .accounts({ ... })
       //     .rpc();
       //
-      // For now, we emit a simulation event so the UI can be built and tested.
-      const simulatedTxHash = `SIM_${Date.now().toString(16).toUpperCase()}`;
-      setState((s) => ({ ...s, txHash: simulatedTxHash }));
+      // We build a no-op transaction here so the wallet signs a real Solana tx,
+      // proving connectivity. Replace with the Anchor call once the IDL is ready.
+      const tx = new Transaction();
+      tx.feePayer = publicKey!;
+      const { blockhash } = await connection.getLatestBlockhash();
+      tx.recentBlockhash = blockhash;
 
+      const signature = await sendTransaction(tx, connection);
+      await connection.confirmTransaction(signature, "confirmed");
+
+      setState((s) => ({ ...s, txHash: signature }));
       console.log(
         `[useSolanaLaunch] Burn ${params.burnAmount} tokens → chains ${params.targetChainIds.join(", ")}`,
-        `\nTx: ${simulatedTxHash}`
+        `\nSolana tx: ${signature}`
       );
 
       // ── Step 2: Wait for Wormhole VAA ─────────────────────────────────────
-      setStep("waiting_for_vaa");
+      setState((s) => ({ ...s, step: "waiting_for_vaa" }));
 
       const vaas = await pollForVAAs(
-        simulatedTxHash,
+        signature,
         params.targetChainIds,
         params.isTestnet
       );
@@ -128,7 +136,7 @@ export function useSolanaLaunch() {
       setState((s) => ({ ...s, vaas }));
 
       // ── Step 3: Submit VAA to EVM chains ──────────────────────────────────
-      setStep("submitting_vaa");
+      setState((s) => ({ ...s, step: "submitting_vaa" }));
 
       for (const vaa of vaas) {
         await submitVAAToEVM(vaa, params.evmRecipient, params.isTestnet);
@@ -136,15 +144,15 @@ export function useSolanaLaunch() {
 
       setState((s) => ({ ...s, step: "complete" }));
     } catch (err) {
-      setError(err instanceof Error ? err : new Error(String(err)));
+      setState((s) => ({ ...s, step: "error", error: err instanceof Error ? err : new Error(String(err)) }));
     }
-  }, []);
+  }, [connected, publicKey, sendTransaction, connection]);
 
   function reset() {
     setState({ step: "idle", txHash: null, vaas: [], error: null, burnTier: null });
   }
 
-  return { state, launch, reset };
+  return { state, launch, reset, connected, publicKey };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -2,14 +2,16 @@
  * SolanaLaunchPanel.tsx – UI for the Solana-first cross-chain burn-to-activate mechanic.
  *
  * The user:
- *  1. Selects how many SPL tokens to burn.
- *  2. Chooses which EVM chains to activate.
- *  3. Enters their EVM recipient address.
- *  4. Clicks "Burn & Activate" → Anchor program burns on Solana → Wormhole VAA → EVM mint.
+ *  1. Connects their Phantom (or any Solana) wallet via the wallet-adapter button.
+ *  2. Selects how many SPL tokens to burn.
+ *  3. Chooses which EVM chains to activate.
+ *  4. Enters their EVM recipient address.
+ *  5. Clicks "Burn & Activate" → wallet signs the Solana transaction → Wormhole VAA → EVM mint.
  */
 "use client";
 
 import { useState } from "react";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import {
   BURN_TIERS,
   getBurnTier,
@@ -25,7 +27,7 @@ interface Props {
 
 export function SolanaLaunchPanel({ isTestnet }: Props) {
   const targets = isTestnet ? TESTNET_TARGETS : MAINNET_TARGETS;
-  const { state, launch, reset } = useSolanaLaunch();
+  const { state, launch, reset, connected, publicKey } = useSolanaLaunch();
 
   const [burnAmount,      setBurnAmount]      = useState(100);
   const [evmRecipient,    setEvmRecipient]    = useState("");
@@ -92,6 +94,30 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+
+      {/* ─── Phantom wallet connect ─────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4">
+        <div>
+          <p className="font-semibold text-purple-900 text-sm">Phantom Wallet</p>
+          {connected && publicKey ? (
+            <p className="text-xs font-mono text-purple-700 break-all mt-0.5">
+              {publicKey.toBase58().slice(0, 4)}…{publicKey.toBase58().slice(-4)}
+            </p>
+          ) : (
+            <p className="text-xs text-purple-600 mt-0.5">Connect to sign the burn transaction</p>
+          )}
+        </div>
+        <WalletMultiButton
+          style={{
+            background: "#7c3aed",
+            borderRadius: "0.75rem",
+            fontSize: "0.875rem",
+            fontWeight: 600,
+            padding: "0.5rem 1.25rem",
+            height: "auto",
+          }}
+        />
+      </div>
 
       {/* ─── Explainer ─────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
@@ -240,14 +266,15 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
       <button
         type="submit"
         disabled={
-          state.step !== "idle" && state.step !== "error" ||
+          !connected ||
           !tier ||
           selectedChains.length === 0 ||
-          !evmRecipient.match(/^0x[0-9a-fA-F]{40}$/)
+          !evmRecipient.match(/^0x[0-9a-fA-F]{40}$/) ||
+          (state.step !== "idle" && state.step !== "error")
         }
         className="w-full rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white shadow hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 disabled:opacity-60 transition-colors"
       >
-        🔥 Burn & Activate Chains
+        {!connected ? "Connect Phantom to continue" : "🔥 Burn & Activate Chains"}
       </button>
     </form>
   );
