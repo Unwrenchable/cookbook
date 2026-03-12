@@ -165,4 +165,6 @@ export const WORMHOLE_API = {
 
 export const SOLANA_TOKEN_BURN_BRIDGE_PROGRAM_ID =
   process.env.NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID ??
-  "TokenBridgeBurnXXXXXXXXXXXXXXXXXXXXXXXXXX";
+  // System program ID is used as a safe placeholder — set the real program ID
+  // in .env.local after running `anchor build` in contracts/solana/
+  "11111111111111111111111111111111";

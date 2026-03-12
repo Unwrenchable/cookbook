@@ -11,11 +11,12 @@ import { TokenForm } from "@/components/TokenForm";
 import { DeployResult } from "@/components/DeployResult";
 import { TokenDashboard } from "@/components/TokenDashboard";
 import { SolanaLaunchPanel } from "@/components/SolanaLaunchPanel";
+import { VanityAddressGenerator } from "@/components/VanityAddressGenerator";
 import { useDeployToken } from "@/hooks/useDeployToken";
 import { getChainById } from "@/lib/chains";
 import type { TokenFormData } from "@/lib/types";
 
-type Tab = "evm" | "solana-bridge" | "dashboard";
+type Tab = "evm" | "solana-bridge" | "vanity" | "dashboard";
 
 export default function HomePage() {
   const { isConnected } = useAccount();
@@ -38,6 +39,7 @@ export default function HomePage() {
   const tabs: { id: Tab; label: string }[] = [
     { id: "evm",           label: "🚀 EVM Launch"        },
     { id: "solana-bridge", label: "🔥 Solana → All Chains" },
+    { id: "vanity",        label: "🔮 Vanity Address"     },
     { id: "dashboard",     label: "📋 My Tokens"          },
   ];
 
@@ -175,6 +177,34 @@ export default function HomePage() {
             <div className="lg:col-span-2">
               <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
                 <SolanaLaunchPanel isTestnet={isTestnet} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Vanity Address Generator ────────────────────────────────────── */}
+        {activeTab === "vanity" && (
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="space-y-4">
+              <h2 className="text-base font-semibold text-gray-800">How vanity addresses work</h2>
+              <div className="rounded-xl border border-gray-200 bg-white p-4 text-sm text-gray-600 space-y-3">
+                <Step n={1} text="Choose a prefix like "cafe", "dead", or "f122" (fizz in leet hex)" />
+                <Step n={2} text="The miner generates random private keys until an address matches" />
+                <Step n={3} text="Copy and save the private key — it's never stored" />
+                <Step n={4} text="Import into MetaMask or use as your token's owner address" />
+              </div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+                <p className="font-semibold mb-1">Leet-hex cheatsheet</p>
+                <div className="grid grid-cols-2 gap-0.5 font-mono">
+                  {[["fizz","f122"],["caps","ca95"],["dead","dead"],["cafe","cafe"],["face","face"],["beef","beef"]].map(([w,h])=>(
+                    <span key={w}>{w} → {h}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="lg:col-span-2">
+              <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+                <VanityAddressGenerator />
               </div>
             </div>
           </div>

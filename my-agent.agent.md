@@ -71,11 +71,18 @@ Task arrives
 |------|---------|
 | `contracts/solana/programs/token-burn-bridge/src/lib.rs` | Anchor program – emits burn events as Wormhole messages |
 | `contracts/evm/contracts/bridge/BurnBridgeReceiver.sol` | EVM side – receives Wormhole VAA, mints ERC20 |
-| `contracts/evm/contracts/factories/TokenFactory.sol` | Factory + clone pattern for EVM tokens |
+| `contracts/evm/contracts/factories/TokenFactory.sol` | Factory + clone pattern for all 9 EVM token flavors |
+| `contracts/evm/contracts/templates/AIAgentToken.sol` | AI agent wallet with auto-burn + meme posting |
+| `contracts/evm/contracts/templates/PolitiFiToken.sol` | Prediction market: YES/NO sides, prize pool, loser burn |
+| `contracts/evm/contracts/templates/UtilityHybridToken.sol` | Staking + auto-burn + governance (SHIB model) |
+| `contracts/evm/contracts/templates/PumpMigrateToken.sol` | Bonding curve → CEX graduation (pump.fun style) |
 | `frontend/src/lib/crossChain.ts` | Chain configs + Wormhole constants |
 | `frontend/src/hooks/useSolanaLaunch.ts` | Solana launch + burn flow hook |
-| `frontend/src/hooks/useDeployToken.ts` | EVM deploy hook |
+| `frontend/src/hooks/useVanityGenerator.ts` | Web Worker vanity address mining hook |
+| `frontend/src/workers/vanityWorker.ts` | Web Worker: mines private keys for vanity addresses |
 | `frontend/src/components/SolanaLaunchPanel.tsx` | Solana-first launch UI |
+| `frontend/src/components/VanityAddressGenerator.tsx` | Vanity address miner UI with leet-hex suggester |
+| `frontend/src/components/NarrativePicker.tsx` | Hot meta narrative picker (AI, PolitiFi, Utility, Pump) |
 | `frontend/src/lib/chains.ts` | Supported EVM networks config |
 | `.agentx/agents.json` | Agent registry for this repo |
 

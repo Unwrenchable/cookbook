@@ -15,11 +15,15 @@ contract TokenFactory is Ownable {
 
     // ─── Token flavors ────────────────────────────────────────────────────────
     enum TokenFlavor {
-        Standard,       // plain ERC20
-        Taxable,        // buy/sell tax
-        Deflationary,   // auto-burn on transfer
-        Reflection,     // redistribution to holders
-        BondingCurve    // meme token with bonding curve
+        Standard,        // plain ERC20
+        Taxable,         // buy/sell tax
+        Deflationary,    // auto-burn on transfer
+        Reflection,      // redistribution to holders
+        BondingCurve,    // meme token with bonding curve
+        AIAgent,         // AI agent wallet with auto-burn + meme posting
+        PolitiFi,        // political prediction market with prize pool + loser burn
+        UtilityHybrid,   // staking + auto-burn + governance (SHIB model)
+        PumpMigrate      // bonding curve → CEX graduation (pump.fun style)
     }
 
     // ─── Deployment parameters ────────────────────────────────────────────────
@@ -51,6 +55,10 @@ contract TokenFactory is Ownable {
     address public deflationaryImpl;
     address public reflectionImpl;
     address public bondingCurveImpl;
+    address public aiAgentImpl;
+    address public politiFiImpl;
+    address public utilityHybridImpl;
+    address public pumpMigrateImpl;
 
     // ─── Deployment tracking ──────────────────────────────────────────────────
     mapping(address => address[]) public tokensByOwner;
@@ -76,23 +84,35 @@ contract TokenFactory is Ownable {
         address _deflationaryImpl,
         address _reflectionImpl,
         address _bondingCurveImpl,
+        address _aiAgentImpl,
+        address _politiFiImpl,
+        address _utilityHybridImpl,
+        address _pumpMigrateImpl,
         uint256 _launchFee,
         address _feeRecipient
     ) Ownable(msg.sender) {
-        require(_standardImpl     != address(0), "TokenFactory: zero standard impl");
-        require(_taxableImpl      != address(0), "TokenFactory: zero taxable impl");
-        require(_deflationaryImpl != address(0), "TokenFactory: zero deflationary impl");
-        require(_reflectionImpl   != address(0), "TokenFactory: zero reflection impl");
-        require(_bondingCurveImpl != address(0), "TokenFactory: zero bonding curve impl");
-        require(_feeRecipient     != address(0), "TokenFactory: zero fee recipient");
+        require(_standardImpl      != address(0), "TokenFactory: zero standard impl");
+        require(_taxableImpl       != address(0), "TokenFactory: zero taxable impl");
+        require(_deflationaryImpl  != address(0), "TokenFactory: zero deflationary impl");
+        require(_reflectionImpl    != address(0), "TokenFactory: zero reflection impl");
+        require(_bondingCurveImpl  != address(0), "TokenFactory: zero bonding curve impl");
+        require(_aiAgentImpl       != address(0), "TokenFactory: zero ai agent impl");
+        require(_politiFiImpl      != address(0), "TokenFactory: zero politifi impl");
+        require(_utilityHybridImpl != address(0), "TokenFactory: zero utility hybrid impl");
+        require(_pumpMigrateImpl   != address(0), "TokenFactory: zero pump migrate impl");
+        require(_feeRecipient      != address(0), "TokenFactory: zero fee recipient");
 
-        standardImpl     = _standardImpl;
-        taxableImpl      = _taxableImpl;
-        deflationaryImpl = _deflationaryImpl;
-        reflectionImpl   = _reflectionImpl;
-        bondingCurveImpl = _bondingCurveImpl;
-        launchFee        = _launchFee;
-        feeRecipient     = _feeRecipient;
+        standardImpl      = _standardImpl;
+        taxableImpl       = _taxableImpl;
+        deflationaryImpl  = _deflationaryImpl;
+        reflectionImpl    = _reflectionImpl;
+        bondingCurveImpl  = _bondingCurveImpl;
+        aiAgentImpl       = _aiAgentImpl;
+        politiFiImpl      = _politiFiImpl;
+        utilityHybridImpl = _utilityHybridImpl;
+        pumpMigrateImpl   = _pumpMigrateImpl;
+        launchFee         = _launchFee;
+        feeRecipient      = _feeRecipient;
     }
 
     // ─── Core: create token ───────────────────────────────────────────────────
@@ -112,7 +132,7 @@ contract TokenFactory is Ownable {
         require(params.totalSupply > 0,           "TokenFactory: zero supply");
         require(params.owner != address(0),        "TokenFactory: zero owner");
         require(
-            uint8(params.flavor) <= uint8(TokenFlavor.BondingCurve),
+            uint8(params.flavor) <= uint8(TokenFlavor.PumpMigrate),
             "TokenFactory: unknown flavor"
         );
         require(
@@ -183,11 +203,15 @@ contract TokenFactory is Ownable {
     // ─── Admin ────────────────────────────────────────────────────────────────
     function setImplementation(TokenFlavor flavor, address impl) external onlyOwner {
         require(impl != address(0), "TokenFactory: zero impl");
-        if (flavor == TokenFlavor.Standard)      standardImpl     = impl;
-        else if (flavor == TokenFlavor.Taxable)       taxableImpl      = impl;
-        else if (flavor == TokenFlavor.Deflationary)  deflationaryImpl = impl;
-        else if (flavor == TokenFlavor.Reflection)    reflectionImpl   = impl;
-        else if (flavor == TokenFlavor.BondingCurve)  bondingCurveImpl = impl;
+        if      (flavor == TokenFlavor.Standard)      standardImpl      = impl;
+        else if (flavor == TokenFlavor.Taxable)        taxableImpl       = impl;
+        else if (flavor == TokenFlavor.Deflationary)   deflationaryImpl  = impl;
+        else if (flavor == TokenFlavor.Reflection)     reflectionImpl    = impl;
+        else if (flavor == TokenFlavor.BondingCurve)   bondingCurveImpl  = impl;
+        else if (flavor == TokenFlavor.AIAgent)         aiAgentImpl       = impl;
+        else if (flavor == TokenFlavor.PolitiFi)        politiFiImpl      = impl;
+        else if (flavor == TokenFlavor.UtilityHybrid)  utilityHybridImpl = impl;
+        else if (flavor == TokenFlavor.PumpMigrate)    pumpMigrateImpl   = impl;
         emit ImplementationUpdated(flavor, impl);
     }
 
@@ -208,6 +232,10 @@ contract TokenFactory is Ownable {
         if (flavor == TokenFlavor.Taxable)        return taxableImpl;
         if (flavor == TokenFlavor.Deflationary)   return deflationaryImpl;
         if (flavor == TokenFlavor.Reflection)     return reflectionImpl;
-        return bondingCurveImpl;
+        if (flavor == TokenFlavor.BondingCurve)   return bondingCurveImpl;
+        if (flavor == TokenFlavor.AIAgent)         return aiAgentImpl;
+        if (flavor == TokenFlavor.PolitiFi)        return politiFiImpl;
+        if (flavor == TokenFlavor.UtilityHybrid)  return utilityHybridImpl;
+        return pumpMigrateImpl;
     }
 }

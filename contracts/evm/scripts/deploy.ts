@@ -12,27 +12,49 @@ async function main() {
   const StandardERC20Factory = await ethers.getContractFactory("StandardERC20");
   const standardImpl = await StandardERC20Factory.deploy();
   await standardImpl.waitForDeployment();
-  console.log(`  StandardERC20    → ${await standardImpl.getAddress()}`);
+  console.log(`  StandardERC20      → ${await standardImpl.getAddress()}`);
 
   const TaxableERC20Factory = await ethers.getContractFactory("TaxableERC20");
   const taxableImpl = await TaxableERC20Factory.deploy();
   await taxableImpl.waitForDeployment();
-  console.log(`  TaxableERC20     → ${await taxableImpl.getAddress()}`);
+  console.log(`  TaxableERC20       → ${await taxableImpl.getAddress()}`);
 
   const DeflationaryERC20Factory = await ethers.getContractFactory("DeflationaryERC20");
   const deflationaryImpl = await DeflationaryERC20Factory.deploy();
   await deflationaryImpl.waitForDeployment();
-  console.log(`  DeflationaryERC20 → ${await deflationaryImpl.getAddress()}`);
+  console.log(`  DeflationaryERC20  → ${await deflationaryImpl.getAddress()}`);
 
   const ReflectionERC20Factory = await ethers.getContractFactory("ReflectionERC20");
   const reflectionImpl = await ReflectionERC20Factory.deploy();
   await reflectionImpl.waitForDeployment();
-  console.log(`  ReflectionERC20  → ${await reflectionImpl.getAddress()}`);
+  console.log(`  ReflectionERC20    → ${await reflectionImpl.getAddress()}`);
 
   const BondingCurveFactory = await ethers.getContractFactory("BondingCurveToken");
   const bondingCurveImpl = await BondingCurveFactory.deploy();
   await bondingCurveImpl.waitForDeployment();
-  console.log(`  BondingCurveToken → ${await bondingCurveImpl.getAddress()}`);
+  console.log(`  BondingCurveToken  → ${await bondingCurveImpl.getAddress()}`);
+
+  // ─── Meta-narrative templates ──────────────────────────────────────────────
+
+  const AIAgentFactory = await ethers.getContractFactory("AIAgentToken");
+  const aiAgentImpl = await AIAgentFactory.deploy();
+  await aiAgentImpl.waitForDeployment();
+  console.log(`  AIAgentToken       → ${await aiAgentImpl.getAddress()}`);
+
+  const PolitiFiFactory = await ethers.getContractFactory("PolitiFiToken");
+  const politiFiImpl = await PolitiFiFactory.deploy();
+  await politiFiImpl.waitForDeployment();
+  console.log(`  PolitiFiToken      → ${await politiFiImpl.getAddress()}`);
+
+  const UtilityHybridFactory = await ethers.getContractFactory("UtilityHybridToken");
+  const utilityHybridImpl = await UtilityHybridFactory.deploy();
+  await utilityHybridImpl.waitForDeployment();
+  console.log(`  UtilityHybridToken → ${await utilityHybridImpl.getAddress()}`);
+
+  const PumpMigrateFactory = await ethers.getContractFactory("PumpMigrateToken");
+  const pumpMigrateImpl = await PumpMigrateFactory.deploy();
+  await pumpMigrateImpl.waitForDeployment();
+  console.log(`  PumpMigrateToken   → ${await pumpMigrateImpl.getAddress()}`);
 
   // ─── 2. Deploy the factory ────────────────────────────────────────────────
   console.log("\nDeploying TokenFactory...");
@@ -48,28 +70,36 @@ async function main() {
     await deflationaryImpl.getAddress(),
     await reflectionImpl.getAddress(),
     await bondingCurveImpl.getAddress(),
+    await aiAgentImpl.getAddress(),
+    await politiFiImpl.getAddress(),
+    await utilityHybridImpl.getAddress(),
+    await pumpMigrateImpl.getAddress(),
     launchFee,
     feeRecipient
   );
   await factory.waitForDeployment();
 
   const factoryAddress = await factory.getAddress();
-  console.log(`  TokenFactory      → ${factoryAddress}`);
-  console.log(`  Launch fee        : ${ethers.formatEther(launchFee)} ETH`);
-  console.log(`  Fee recipient     : ${feeRecipient}`);
+  console.log(`  TokenFactory       → ${factoryAddress}`);
+  console.log(`  Launch fee         : ${ethers.formatEther(launchFee)} ETH`);
+  console.log(`  Fee recipient      : ${feeRecipient}`);
 
   // ─── 3. Summary ───────────────────────────────────────────────────────────
   console.log("\n=== Deployment Summary ===");
   console.log(JSON.stringify({
-    network:          network.name,
-    deployer:         deployer.address,
-    tokenFactory:     factoryAddress,
+    network:         network.name,
+    deployer:        deployer.address,
+    tokenFactory:    factoryAddress,
     implementations: {
       standard:      await standardImpl.getAddress(),
       taxable:       await taxableImpl.getAddress(),
       deflationary:  await deflationaryImpl.getAddress(),
       reflection:    await reflectionImpl.getAddress(),
       bondingCurve:  await bondingCurveImpl.getAddress(),
+      aiAgent:       await aiAgentImpl.getAddress(),
+      politiFi:      await politiFiImpl.getAddress(),
+      utilityHybrid: await utilityHybridImpl.getAddress(),
+      pumpMigrate:   await pumpMigrateImpl.getAddress(),
     },
   }, null, 2));
 

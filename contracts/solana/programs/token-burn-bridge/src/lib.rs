@@ -29,7 +29,10 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount};
 
-declare_id!("TokenBridgeBurnXXXXXXXXXXXXXXXXXXXXXXXXXX");
+/// Program ID placeholder — replace with the output of `anchor build` / `solana-keygen new`.
+/// Run: `solana-keygen new --outfile target/deploy/token_burn_bridge-keypair.json`
+/// then: `anchor build` and copy the program ID from the output.
+declare_id!("11111111111111111111111111111111");
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
