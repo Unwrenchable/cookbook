@@ -44,6 +44,12 @@ const config: HardhatUserConfig = {
       accounts: [PRIVATE_KEY],
       chainId: 80001,
     },
+    // Polygon Amoy replaces Mumbai as the official Polygon testnet
+    polygonAmoy: {
+      url: `https://polygon-amoy.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+      accounts: [PRIVATE_KEY],
+      chainId: 80002,
+    },
     arbitrumSepolia: {
       url: `https://arb-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
       accounts: [PRIVATE_KEY],

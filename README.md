@@ -27,7 +27,7 @@ A dark, beautiful, production-ready degen launchpad supporting testnets and main
   1. **Standard ERC20** – plain transferable token
   2. **Taxable** – configurable buy/sell tax forwarded to a marketing wallet
   3. **Deflationary** – auto-burn on every transfer
-  4. **Reflection** – redistribution to all holders
+  4. **Reflection** – redistribution to all holders via claim mechanic
   5. **Bonding Curve** – pump.fun-style meme token (price increases with supply)
   6. **🤖 AI Agent** – on-chain AI agent wallet with daily burn cap + meme posting
   7. **🏛️ PolitiFi** – binary prediction market, prize pool for winners, burn for losers
@@ -73,16 +73,28 @@ tokenforge/
 ├── contracts/evm/
 │   ├── contracts/
 │   │   ├── factories/TokenFactory.sol      ← one factory per chain
-│   │   └── templates/
-│   │       ├── StandardERC20.sol
-│   │       ├── TaxableERC20.sol
-│   │       ├── DeflationaryERC20.sol
-│   │       ├── ReflectionERC20.sol
-│   │       └── BondingCurveToken.sol
-│   ├── scripts/deploy.ts
+│   │   ├── templates/
+│   │   │   ├── StandardERC20.sol
+│   │   │   ├── TaxableERC20.sol
+│   │   │   ├── DeflationaryERC20.sol
+│   │   │   ├── ReflectionERC20.sol
+│   │   │   ├── BondingCurveToken.sol
+│   │   │   ├── AIAgentToken.sol
+│   │   │   ├── PolitiFiToken.sol
+│   │   │   ├── UtilityHybridToken.sol
+│   │   │   └── PumpMigrateToken.sol
+│   │   ├── bridge/
+│   │   │   └── BurnBridgeReceiver.sol      ← Wormhole VAA receiver (scaffold)
+│   │   └── lockers/
+│   │       └── LPLocker.sol
+│   ├── scripts/
+│   │   ├── deploy.ts                       ← factory + locker deploy
+│   │   └── deployBurnBridgeReceiver.ts
 │   ├── test/TokenFactory.test.ts
 │   ├── hardhat.config.ts
 │   └── .env.example
+├── contracts/solana/
+│   └── programs/token-burn-bridge/         ← Anchor burn program
 ├── frontend/
 │   └── src/
 │       ├── app/                            ← Next.js App Router pages
@@ -163,6 +175,12 @@ ALCHEMY_API_KEY=...
 ETHERSCAN_API_KEY=...
 BSCSCAN_API_KEY=...
 POLYGONSCAN_API_KEY=...
+ARBISCAN_API_KEY=...
+BASESCAN_API_KEY=...
+# BurnBridgeReceiver
+SOLANA_EMITTER=0x...       # token-burn-bridge program ID as bytes32 hex
+MINTABLE_TOKEN=0x...       # ERC20 to mint after bridge calls
+MINT_RATIO=1000000000      # SPL (9 dec) → ERC20 (18 dec) ratio
 ```
 
 ### frontend/.env.example
@@ -172,6 +190,9 @@ NEXT_PUBLIC_ALCHEMY_KEY=...
 NEXT_PUBLIC_FACTORY_SEPOLIA=0x...   # deployed factory addresses
 NEXT_PUBLIC_FACTORY_MAINNET=0x...
 # ... (one per chain)
+# Optional
+OPENAI_API_KEY=sk-...               # AI description generator
+PINATA_JWT=...                      # IPFS metadata upload
 ```
 
 ---
@@ -180,21 +201,25 @@ NEXT_PUBLIC_FACTORY_MAINNET=0x...
 
 - All template contracts are verified on Etherscan / BscScan / etc. after deployment.
 - The factory is **immutable** after deployment.
-- No upgradeable proxies are used unless the user chooses the "upgradable" flavor (planned).
+- No upgradeable proxies are used in the factory itself; template implementations are upgradeable only via the admin `setImplementation()` call, which only affects **future** tokens (existing clones are unaffected).
 - Factory enforces: total fees ≤ 30%, owner ≠ zero address, supply > 0.
+- `LPLocker` uses `ReentrancyGuard` and `SafeERC20` on all state-changing paths.
+- `BurnBridgeReceiver.receiveMessage()` **currently reverts** — it is a scaffold awaiting full Wormhole VAA integration. Use `receiveRelayedMessage()` with a trusted relayer for development testing. See [`docs/CROSS_CHAIN_BURN_BRIDGE.md`](docs/CROSS_CHAIN_BURN_BRIDGE.md).
+- Before mainnet deployment: set `feeRecipient` in `scripts/deploy.ts` to your treasury / multisig wallet (not the deployer key).
 
 ---
 
 ## Roadmap
 
-- [x] MVP: 5 flavors, 11 chains, one-click deploy
-- [ ] Bonding-curve launch (pump.fun style) – fully on-chain
-- [ ] Solana SPL token support
-- [ ] Cross-chain token bridge (LayerZero)
+- [x] MVP: 9 flavors, 11 chains, one-click deploy
+- [x] Bonding-curve launch (pump.fun style) – BondingCurveToken + PumpMigrateToken
+- [x] Cross-chain Solana → EVM burn bridge (Wormhole, scaffold)
+- [x] Referral system + IPFS metadata + AI description generator
+- [x] LP Locker + swap widget
+- [ ] Full Wormhole VAA on-chain verification in BurnBridgeReceiver
+- [ ] Solana SPL token launchpad (direct from frontend)
 - [ ] Mobile app (React Native)
-- [ ] AI token description generator
-- [ ] IPFS metadata upload
-- [ ] Basic audit report generator
+- [ ] Governance module for UtilityHybridToken proposals
 
 ---
 

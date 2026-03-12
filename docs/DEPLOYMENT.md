@@ -119,8 +119,8 @@ pnpm deploy:sepolia
 # BNB Smart Chain Testnet
 pnpm deploy:bscTestnet
 
-# Polygon Mumbai
-pnpm deploy:polygonMumbai
+# Polygon Amoy (replaces the deprecated Mumbai testnet)
+pnpm deploy:polygonAmoy
 
 # Arbitrum Sepolia
 pnpm deploy:arbitrumSepolia
@@ -217,7 +217,7 @@ NEXT_PUBLIC_ALCHEMY_KEY=your_alchemy_api_key
 # Paste the tokenFactory address from each chain's deploy output
 NEXT_PUBLIC_FACTORY_SEPOLIA=0x...
 NEXT_PUBLIC_FACTORY_BSC_TESTNET=0x...
-NEXT_PUBLIC_FACTORY_POLYGON_MUMBAI=0x...
+NEXT_PUBLIC_FACTORY_POLYGON_AMOY=0x...
 NEXT_PUBLIC_FACTORY_ARB_SEPOLIA=0x...
 NEXT_PUBLIC_FACTORY_BASE_SEPOLIA=0x...
 NEXT_PUBLIC_FACTORY_MAINNET=0x...
@@ -288,7 +288,7 @@ pnpm deploy:avalanche      # Avalanche C-Chain
 > **Mainnet checklist before deploying:**
 > - [ ] All tests pass (`pnpm test`)
 > - [ ] Deployer wallet has enough native token for gas on each chain
-> - [ ] `feeRecipient` in `scripts/deploy.ts` is set to your treasury wallet (not the deployer key)
+> - [ ] `feeRecipient` in `scripts/deploy.ts` is set to your **treasury / multisig wallet** (not the deployer key — the default value is the deployer address, which means fees accumulate in the same hot wallet used for deployment)
 > - [ ] You've done a dry-run on testnet with the same parameters
 > - [ ] `.env` is not committed to git
 
@@ -361,6 +361,8 @@ Done — the UI detects the new chain immediately on next build.
 
 If you want to enable the **burn-to-activate** cross-chain mechanic (burn SPL tokens on Solana → mint ERC20 on EVM), follow the guide in [`docs/CROSS_CHAIN_BURN_BRIDGE.md`](./CROSS_CHAIN_BURN_BRIDGE.md).
 
+> ⚠️ **Scaffold status:** `BurnBridgeReceiver.receiveMessage()` currently reverts with a clear error message until the Wormhole VAA integration is complete. Development testing uses `receiveRelayedMessage()` with a trusted relayer. See the bridge guide for details.
+
 The short version:
 
 ```bash
@@ -369,13 +371,27 @@ cd contracts/solana
 anchor build
 anchor deploy --provider.cluster devnet
 
-# 2. Deploy BurnBridgeReceiver on each EVM chain
-cd ../evm
-npx hardhat run scripts/deployBridge.ts --network sepolia
+# 2. Set SOLANA_EMITTER in contracts/evm/.env (program ID as bytes32 hex)
+# 3. Set MINTABLE_TOKEN (the ERC20 that will be minted after bridge calls)
 
-# 3. Set env vars
+# 4. Deploy BurnBridgeReceiver on each EVM chain (testnets first)
+cd ../evm
+pnpm deploy:bridge:sepolia
+pnpm deploy:bridge:arbitrumSepolia
+pnpm deploy:bridge:baseSepolia
+
+# 5. Mainnet bridge deployment (after testnet verification)
+pnpm deploy:bridge:mainnet
+pnpm deploy:bridge:arbitrum
+pnpm deploy:bridge:base
+pnpm deploy:bridge:bsc
+pnpm deploy:bridge:polygon
+pnpm deploy:bridge:avalanche
+
+# 6. Set env vars in frontend/.env.local
 #    NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID=<from anchor deploy>
-#    NEXT_PUBLIC_RECEIVER_SEPOLIA=<from deployBridge output>
+#    NEXT_PUBLIC_RECEIVER_SEPOLIA=<from deploy:bridge:sepolia output>
+#    ... (one per chain)
 ```
 
 ---

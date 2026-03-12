@@ -124,7 +124,11 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
         require(amount >= minTokens, "PumpMigrateToken: slippage");
         require(amount > 0,          "PumpMigrateToken: zero tokens");
 
-        ethReserve += ethIn;
+        // Charge only the exact bonding-curve cost; refund unused ETH to buyer.
+        uint256 cost   = getBuyCost(amount);
+        uint256 excess = ethIn - cost;
+
+        ethReserve += cost;
         _mint(msg.sender, amount);
 
         // Forward fee
@@ -133,7 +137,13 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
             require(sent, "PumpMigrateToken: fee failed");
         }
 
-        emit Buy(msg.sender, amount, ethIn);
+        // Refund any ETH not consumed by the curve
+        if (excess > 0) {
+            (bool ok,) = msg.sender.call{value: excess}("");
+            require(ok, "PumpMigrateToken: refund failed");
+        }
+
+        emit Buy(msg.sender, amount, cost);
 
         // Check graduation
         if (!isGraduated && ethReserve >= graduationThreshold) {
