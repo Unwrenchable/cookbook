@@ -13,8 +13,7 @@ const ALCHEMY_NETWORKS: Record<string, string> = {
   "1":        "eth-mainnet",
   "11155111": "eth-sepolia",
   "137":      "polygon-mainnet",
-  "80001":    "polygon-mumbai",   // Polygon Mumbai (deprecated testnet)
-  "80002":    "polygon-amoy",     // Polygon Amoy (current testnet)
+  "80002":    "polygon-amoy",
   "42161":    "arb-mainnet",
   "421614":   "arb-sepolia",
   "8453":     "base-mainnet",
@@ -44,7 +43,7 @@ export async function POST(
   try {
     body = await request.text();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: "Failed to read request body" }, { status: 400 });
   }
 
   let upstream: Response;

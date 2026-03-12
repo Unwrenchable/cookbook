@@ -17,7 +17,7 @@ import {
   bsc,
   bscTestnet,
   polygon,
-  polygonMumbai,
+  polygonAmoy,
   arbitrum,
   arbitrumSepolia,
   base,
@@ -41,25 +41,25 @@ export const wagmiConfig = getDefaultConfig({
     // Testnets
     sepolia,
     bscTestnet,
-    polygonMumbai,
+    polygonAmoy,
     arbitrumSepolia,
     baseSepolia,
   ],
   transports: {
     // Route Alchemy-backed chains through the server-side proxy to keep
     // ALCHEMY_KEY out of the browser bundle.
-    [mainnet.id]:        http("/api/rpc/1"),
-    [sepolia.id]:        http("/api/rpc/11155111"),
-    [polygon.id]:        http("/api/rpc/137"),
-    [polygonMumbai.id]:  http("/api/rpc/80001"),
-    [arbitrum.id]:       http("/api/rpc/42161"),
+    [mainnet.id]:         http("/api/rpc/1"),
+    [sepolia.id]:         http("/api/rpc/11155111"),
+    [polygon.id]:         http("/api/rpc/137"),
+    [polygonAmoy.id]:     http("/api/rpc/80002"),
+    [arbitrum.id]:        http("/api/rpc/42161"),
     [arbitrumSepolia.id]: http("/api/rpc/421614"),
-    [base.id]:           http("/api/rpc/8453"),
-    [baseSepolia.id]:    http("/api/rpc/84532"),
-    // Public-RPC chains use their default transports.
-    [bsc.id]:            http("https://bsc-dataseed.binance.org/"),
-    [bscTestnet.id]:     http("https://data-seed-prebsc-1-s1.binance.org:8545"),
-    [avalanche.id]:      http("https://api.avax.network/ext/bc/C/rpc"),
+    [base.id]:            http("/api/rpc/8453"),
+    [baseSepolia.id]:     http("/api/rpc/84532"),
+    // Public-RPC chains use direct transports.
+    [bsc.id]:             http("https://bsc-dataseed.binance.org/"),
+    [bscTestnet.id]:      http("https://data-seed-prebsc-1-s1.binance.org:8545"),
+    [avalanche.id]:       http("https://api.avax.network/ext/bc/C/rpc"),
   },
   ssr: true,
 });

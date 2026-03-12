@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.text();
   } catch {
-    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json({ error: "Failed to read request body" }, { status: 400 });
   }
 
   let upstream: Response;
