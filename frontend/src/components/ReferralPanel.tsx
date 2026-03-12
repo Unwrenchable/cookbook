@@ -29,6 +29,20 @@ export function ReferralPanel() {
       : undefined
   );
 
+  const { data: referralShareBps } = useReadContract(
+    factoryAddress
+      ? {
+          address: factoryAddress,
+          abi: TOKEN_FACTORY_ABI,
+          functionName: "referralShareBps",
+        }
+      : undefined
+  );
+
+  const referralPct = referralShareBps !== undefined
+    ? `${(Number(referralShareBps) / 100).toFixed(0)}%`
+    : "20%";  // display fallback while loading
+
   const { writeContractAsync, isPending } = useWriteContract();
 
   const referralUrl =
@@ -80,7 +94,7 @@ export function ReferralPanel() {
       {/* Referral link */}
       <div className="space-y-2">
         <p className="text-xs text-gray-400">
-          Share this link. When someone deploys via your link, you earn 20% of their launch fee.
+          Share this link. When someone deploys via your link, you earn {referralPct} of their launch fee.
         </p>
         <div className="flex items-center gap-2 rounded-xl border border-dark-border bg-dark-muted px-4 py-3">
           <code className="flex-1 truncate text-xs text-brand-400">

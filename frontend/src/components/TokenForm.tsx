@@ -215,7 +215,7 @@ export function TokenForm({
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="text-sm font-medium text-gray-700">
-            Description <span className="text-gray-400 font-normal">(optional, used for IPFS metadata)</span>
+            Description <span className="text-gray-400 font-normal">(optional — auto-fills the IPFS Upload tab)</span>
           </label>
           <button
             type="button"
@@ -235,7 +235,7 @@ export function TokenForm({
           value={form.description}
           onChange={(e) => set("description", e.target.value)}
           rows={2}
-          placeholder="Token description (optional, used for IPFS metadata)"
+          placeholder="Token description — auto-fills the IPFS Upload tab when you switch to it"
           className={`${inputCls} resize-none`}
         />
         {aiError && (

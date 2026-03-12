@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     const jwt = process.env.PINATA_JWT;
 
     if (!jwt) {
-      // Dev fallback: return unique mock hashes based on filename + timestamp
+      // Dev-only mock hashes — NOT valid IPFS CIDs. Set PINATA_JWT for real uploads.
       const seed = `${file.name}-${Date.now()}`;
       const mockBase = seed.replace(/[^a-zA-Z0-9]/g, "").slice(0, 40).padEnd(40, "0");
       const mockImageHash = `QmImg${mockBase}`;

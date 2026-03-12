@@ -138,6 +138,8 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         nonReentrant
         returns (address tokenAddress)
     {
+        // launchFee is the flat minimum. Effective fee = max(launchFee, msg.value × launchFeeBps / 10000).
+        // Any ETH above the effective fee is returned to the caller.
         require(msg.value >= launchFee, "TokenFactory: insufficient launch fee");
         _validateParams(params);
 
@@ -170,6 +172,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         nonReentrant
         returns (address tokenAddress)
     {
+        // Same fee model as createToken: max(launchFee, msg.value × launchFeeBps / 10000).
         require(msg.value >= launchFee, "TokenFactory: insufficient launch fee");
         _validateParams(params);
 

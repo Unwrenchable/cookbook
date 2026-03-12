@@ -7,11 +7,12 @@
  */
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { useChainId, useAccount, useReadContract, useWriteContract } from "wagmi";
 import { parseEther } from "viem";
 
 // Per-chain DEX config
+const SWAP_DEADLINE_SECONDS = 300; // 5 minutes
 interface DexConfig {
   name:    string;
   logo:    string;
@@ -221,17 +222,12 @@ export function SwapWidget() {
       : undefined
   );
 
-  // Update estimated output when amountsOut resolves
-  const lastAmountsOut = useRef<readonly bigint[] | undefined>(undefined);
-  if (amountsOut !== lastAmountsOut.current) {
-    lastAmountsOut.current = amountsOut as readonly bigint[] | undefined;
+  // Sync estimated output via useEffect to avoid setState during render
+  useEffect(() => {
     if (Array.isArray(amountsOut) && amountsOut.length >= 2) {
-      // Use a microtask to avoid setState during render
-      Promise.resolve().then(() =>
-        setEstimatedOut(amountsOut[amountsOut.length - 1] as bigint)
-      );
+      setEstimatedOut(amountsOut[amountsOut.length - 1] as bigint);
     }
-  }
+  }, [amountsOut]);
 
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
@@ -240,7 +236,7 @@ export function SwapWidget() {
     setSwapStatus("idle");
     setSwapError(null);
 
-    const deadline = BigInt(Math.floor(Date.now() / 1000) + 300); // 5 min
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + SWAP_DEADLINE_SECONDS);
     const amountOutMin = estimatedOut ? (estimatedOut * 99n) / 100n : 0n; // 1% slippage
 
     try {
