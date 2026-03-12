@@ -119,7 +119,9 @@ tokenforge/
 
 ## Deployment
 
-For a full step-by-step deployment guide — including environment setup, testnet and mainnet contract deployment, contract verification, frontend configuration, and Vercel hosting — see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+The frontend is deployed **exclusively on Vercel**. A [`vercel.json`](vercel.json) at the repo root handles monorepo build routing, security headers, CDN cache rules, and build-ignore logic.
+
+For the complete guide — contracts deployment, environment variables, and the full Vercel setup — see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
 
 ### Quick start (local dev)
 

@@ -43,6 +43,7 @@ const WORMHOLE_CORE: Record<string, string> = {
   bscTestnet:  "0x68605AD7b15c732a30b1BbC62BE8425E9Bb182E9",
   polygonMumbai:    "0x0CBE91CF822c73C2315FB05100C2F714765d5c20",  // deprecated: use Amoy instead
   polygonAmoy:      "0x6b9C8671cdDC8dEab9c719bB87cBd3e782bA6a35",
+  arbitrumSepolia:  "0x6b9C8671cdDC8dEab9c719bB87cBd3e782bA6a35",
   baseSepolia:      "0x79A1027a6A159502049F10906D333EC57E95F083",
 };
 
