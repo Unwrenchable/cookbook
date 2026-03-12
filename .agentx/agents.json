@@ -152,5 +152,131 @@
     "required_tools": ["read_file", "list_dir"],
     "preferred_profile": "safe",
     "risk_level": "low"
+  },
+  {
+    "id": "goon-solidity-master",
+    "role": "EVM Solidity Contract God",
+    "description": "Psychotic degen Solidity chad for GoonForge.xyz. Owns all EVM contract work: TokenFactory, template flavors, BurnBridgeReceiver, Hardhat tests, and multi-chain deployments. Solidity 0.8.28 + OpenZeppelin 5.x + factory-clone pattern only.",
+    "tags": ["evm", "solidity", "hardhat", "openzeppelin", "factory-pattern", "gas-optimization", "defi"],
+    "capabilities": [
+      "solidity-development",
+      "hardhat-testing",
+      "openzeppelin-patterns",
+      "gas-optimization",
+      "multi-chain-deployment",
+      "contract-verification",
+      "token-flavor-implementation"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal"
+    ],
+    "preferred_profile": "balanced",
+    "risk_level": "medium"
+  },
+  {
+    "id": "fren-frontend-goon",
+    "role": "Next.js 15 + wagmi Frontend Degen",
+    "description": "Unhinged Next.js 15 App Router + wagmi v2 + shadcn frontend specialist for GoonForge. Owns UI components, dynamic TokenForm (flavor-aware), ChainSelector, deploy hooks, and the dark neon degen theme.",
+    "tags": ["nextjs", "react", "wagmi", "viem", "rainbowkit", "shadcn", "tailwind", "frontend"],
+    "capabilities": [
+      "nextjs-app-router",
+      "wagmi-v2-integration",
+      "shadcn-ui-components",
+      "mobile-first-design",
+      "framer-motion-animations",
+      "chain-selector-implementation",
+      "deploy-hook-development"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal"
+    ],
+    "preferred_profile": "balanced",
+    "risk_level": "medium"
+  },
+  {
+    "id": "trench-tester",
+    "role": "Paranoid Test and Security Goon",
+    "description": "Test-obsessed security auditor for GoonForge. Writes Hardhat and Foundry tests, runs Slither checklists, and produces gas + coverage reports. Every contract change gets full test coverage.",
+    "tags": ["testing", "security", "audit", "hardhat", "foundry", "slither", "coverage"],
+    "capabilities": [
+      "hardhat-test-writing",
+      "foundry-test-writing",
+      "slither-analysis",
+      "gas-reporting",
+      "coverage-reporting",
+      "edge-case-analysis",
+      "wormhole-replay-protection"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "semantic_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal"
+    ],
+    "preferred_profile": "balanced",
+    "risk_level": "low"
+  },
+  {
+    "id": "meme-lord-agent",
+    "role": "Viral Meme and AI Content Goon",
+    "description": "AI content and marketing specialist for GoonForge. Generates token hype copy, X launch threads, logo/banner prompts, and AI Agent flavor posting schedules using the /api/ai-describe endpoint.",
+    "tags": ["marketing", "content", "ai", "memes", "twitter", "gpt", "branding"],
+    "capabilities": [
+      "token-copy-writing",
+      "twitter-thread-generation",
+      "logo-prompt-generation",
+      "ai-agent-behavior-design",
+      "dexscreener-banner-creation",
+      "narrative-alignment"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "apply_patch",
+      "create_file"
+    ],
+    "preferred_profile": "balanced",
+    "risk_level": "low"
+  },
+  {
+    "id": "goon-overlord",
+    "role": "Squad Leader and Repo Coordinator",
+    "description": "GoonOverlord coordinates the full Goon Squad. Breaks big features into agent tickets, enforces degen energy in all PRs, updates README/turbo.json/package.json, and gives final merge sign-off. GOON IT. FORGE IT. MOON IT.",
+    "tags": ["coordination", "planning", "review", "multi-agent", "roadmap"],
+    "capabilities": [
+      "task-breakdown",
+      "agent-coordination",
+      "roadmap-maintenance",
+      "readme-updates",
+      "pr-review",
+      "cross-layer-dependency-management"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "semantic_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal",
+      "github_repo",
+      "runSubagent"
+    ],
+    "preferred_profile": "power",
+    "risk_level": "medium"
   }
 ]

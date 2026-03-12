@@ -105,7 +105,11 @@ tokenforge/
 
 ---
 
-## How to Run Locally
+## Deployment
+
+For a full step-by-step deployment guide — including environment setup, testnet and mainnet contract deployment, contract verification, frontend configuration, and Vercel hosting — see **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
+### Quick start (local dev)
 
 ```bash
 # 1. Clone & install
@@ -117,7 +121,6 @@ pnpm install
 # 2. Contracts – compile & test
 cd contracts/evm
 cp .env.example .env
-pnpm install
 pnpm compile
 pnpm test
 
@@ -125,7 +128,6 @@ pnpm test
 cd ../../frontend
 cp .env.example .env.local
 # Edit .env.local: add your WalletConnect project ID and Alchemy key
-pnpm install
 pnpm dev
 # Open http://localhost:3000
 ```
