@@ -1,0 +1,15 @@
+# CODEOWNERS — every pull request touching these paths requires approval
+# from the listed owners before it can be merged into a protected branch.
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global default: all files require approval from the repo owner
+* @Unwrenchable
+
+# Smart contracts — extra scrutiny for anything on-chain
+/contracts/ @Unwrenchable
+
+# Frontend
+/frontend/ @Unwrenchable
+
+# CI / repo config
+/.github/ @Unwrenchable
