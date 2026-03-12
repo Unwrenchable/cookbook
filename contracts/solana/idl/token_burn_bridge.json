@@ -1,33 +1,33 @@
 {
-  "version": "0.1.0",
-  "name": "token_burn_bridge",
+  "address": "11111111111111111111111111111111",
+  "metadata": {
+    "name": "token_burn_bridge",
+    "version": "0.1.0",
+    "spec": "0.1.0"
+  },
   "instructions": [
     {
       "name": "initialize",
+      "discriminator": [175, 175, 109, 31, 13, 152, 155, 237],
       "docs": ["Called once by the deployer to configure the bridge."],
       "accounts": [
         {
           "name": "config",
-          "isMut": true,
-          "isSigner": false,
+          "writable": true,
           "docs": ["Bridge config PDA (seeds: [\"bridge-config\"])"]
         },
         {
           "name": "tokenMint",
-          "isMut": false,
-          "isSigner": false,
           "docs": ["The SPL token mint that will be burned"]
         },
         {
           "name": "authority",
-          "isMut": true,
-          "isSigner": true,
+          "writable": true,
+          "signer": true,
           "docs": ["Payer and authority over the bridge config"]
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -35,7 +35,9 @@
           "name": "evmReceiverAddresses",
           "type": {
             "vec": {
-              "defined": "EvmChainReceiver"
+              "defined": {
+                "name": "EvmChainReceiver"
+              }
             }
           }
         }
@@ -43,6 +45,7 @@
     },
     {
       "name": "burnAndBridge",
+      "discriminator": [187, 9, 252, 183, 112, 230, 84, 14],
       "docs": [
         "Burns SPL tokens and emits a Wormhole cross-chain message to activate",
         "ERC20 minting on one or more EVM chains."
@@ -50,39 +53,31 @@
       "accounts": [
         {
           "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "tokenMint",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "userTokenAccount",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "userNonce",
-          "isMut": true,
-          "isSigner": false,
+          "writable": true,
           "docs": ["Per-user nonce PDA for replay protection (seeds: [\"user-nonce\", user])"]
         },
         {
           "name": "user",
-          "isMut": true,
-          "isSigner": true
+          "writable": true,
+          "signer": true
         },
         {
-          "name": "tokenProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "tokenProgram"
         },
         {
-          "name": "systemProgram",
-          "isMut": false,
-          "isSigner": false
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -108,17 +103,16 @@
     },
     {
       "name": "updateReceivers",
+      "discriminator": [93, 113, 76, 123, 168, 158, 158, 229],
       "docs": ["Update the list of EVM chain receivers (only authority)."],
       "accounts": [
         {
           "name": "config",
-          "isMut": true,
-          "isSigner": false
+          "writable": true
         },
         {
           "name": "authority",
-          "isMut": false,
-          "isSigner": true
+          "signer": true
         }
       ],
       "args": [
@@ -126,7 +120,9 @@
           "name": "evmReceivers",
           "type": {
             "vec": {
-              "defined": "EvmChainReceiver"
+              "defined": {
+                "name": "EvmChainReceiver"
+              }
             }
           }
         }
@@ -136,12 +132,13 @@
   "accounts": [
     {
       "name": "BridgeConfig",
+      "discriminator": [40, 206, 51, 233, 246, 40, 178, 85],
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "authority",         "type": "publicKey" },
-          { "name": "tokenMint",         "type": "publicKey" },
-          { "name": "evmReceivers",      "type": { "vec": { "defined": "EvmChainReceiver" } } },
+          { "name": "authority",         "type": "pubkey" },
+          { "name": "tokenMint",         "type": "pubkey" },
+          { "name": "evmReceivers",      "type": { "vec": { "defined": { "name": "EvmChainReceiver" } } } },
           { "name": "totalBurned",       "type": "u64" },
           { "name": "totalMessagesSent", "type": "u64" },
           { "name": "bump",              "type": "u8" }
@@ -150,6 +147,7 @@
     },
     {
       "name": "UserNonce",
+      "discriminator": [235, 133, 1, 243, 18, 135, 88, 224],
       "type": {
         "kind": "struct",
         "fields": [
@@ -174,28 +172,26 @@
   "events": [
     {
       "name": "BurnMessageEmitted",
+      "discriminator": [31, 132, 141, 109, 6, 47, 154, 84],
       "fields": [
-        { "name": "sequence",         "type": "u64",                   "index": false },
-        { "name": "solanaMint",       "type": "publicKey",             "index": false },
-        { "name": "solanaSender",     "type": "publicKey",             "index": false },
-        { "name": "evmRecipient",     "type": { "array": ["u8", 20] }, "index": false },
-        { "name": "amountBurned",     "type": "u64",                   "index": false },
-        { "name": "targetChainId",    "type": "u16",                   "index": false },
-        { "name": "payloadHash",      "type": { "array": ["u8", 32] }, "index": false },
-        { "name": "consistencyLevel", "type": "u8",                    "index": false }
+        { "name": "sequence",         "type": "u64" },
+        { "name": "solanaMint",       "type": "pubkey" },
+        { "name": "solanaSender",     "type": "pubkey" },
+        { "name": "evmRecipient",     "type": { "array": ["u8", 20] } },
+        { "name": "amountBurned",     "type": "u64" },
+        { "name": "targetChainId",    "type": "u16" },
+        { "name": "payloadHash",      "type": { "array": ["u8", 32] } },
+        { "name": "consistencyLevel", "type": "u8" }
       ]
     }
   ],
   "errors": [
-    { "code": 6000, "name": "BurnTooSmall",       "msg": "Burn amount too small. Minimum is 100 tokens to activate 1 chain." },
-    { "code": 6001, "name": "InsufficientBalance", "msg": "Insufficient token balance." },
-    { "code": 6002, "name": "UnsupportedChain",    "msg": "Target chain not supported. Add it via update_receivers." },
-    { "code": 6003, "name": "WrongMint",           "msg": "Token mint does not match bridge config." },
-    { "code": 6004, "name": "WrongOwner",          "msg": "Token account owner does not match signer." },
-    { "code": 6005, "name": "Unauthorized",        "msg": "Unauthorized: only the bridge authority can call this." },
-    { "code": 6006, "name": "TooManyReceivers",    "msg": "Too many EVM receivers. Maximum is 10." }
-  ],
-  "metadata": {
-    "address": "11111111111111111111111111111111"
-  }
+    { "code": 6000, "name": "BurnTooSmall",        "msg": "Burn amount too small. Minimum is 100 tokens to activate 1 chain." },
+    { "code": 6001, "name": "InsufficientBalance",  "msg": "Insufficient token balance." },
+    { "code": 6002, "name": "UnsupportedChain",     "msg": "Target chain not supported. Add it via update_receivers." },
+    { "code": 6003, "name": "WrongMint",            "msg": "Token mint does not match bridge config." },
+    { "code": 6004, "name": "WrongOwner",           "msg": "Token account owner does not match signer." },
+    { "code": 6005, "name": "Unauthorized",         "msg": "Unauthorized: only the bridge authority can call this." },
+    { "code": 6006, "name": "TooManyReceivers",     "msg": "Too many EVM receivers. Maximum is 10." }
+  ]
 }

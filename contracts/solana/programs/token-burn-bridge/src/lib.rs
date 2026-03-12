@@ -295,15 +295,16 @@ pub struct UpdateReceivers<'info> {
 pub struct BridgeConfig {
     pub authority:           Pubkey,              // 32
     pub token_mint:          Pubkey,              // 32
-    pub evm_receivers:       Vec<EvmChainReceiver>, // 4 + 10*34 = 344
+    pub evm_receivers:       Vec<EvmChainReceiver>, // 4 + 10*23 = 234
     pub total_burned:        u64,                 // 8
     pub total_messages_sent: u64,                 // 8
     pub bump:                u8,                  // 1
 }
 
 impl BridgeConfig {
-    // 8 (discriminator) + 32 + 32 + 4 + (10 * 34) + 8 + 8 + 1
-    pub const LEN: usize = 8 + 32 + 32 + 4 + (10 * 34) + 8 + 8 + 1;
+    // 8 (discriminator) + 32 + 32 + 4 + (10 * 23) + 8 + 8 + 1
+    // EvmChainReceiver: 2 (chain_id u16) + 20 (receiver_address [u8;20]) + 1 (is_active bool) = 23
+    pub const LEN: usize = 8 + 32 + 32 + 4 + (10 * 23) + 8 + 8 + 1;
 }
 
 /// Per-user nonce counter for Wormhole replay protection

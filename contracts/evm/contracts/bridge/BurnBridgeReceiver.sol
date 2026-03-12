@@ -18,7 +18,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * Wormhole VAA body format (as packed by the Anchor program):
  *   bytes32 solanaSourceMint   (offset 0)
  *   bytes32 solanaSender       (offset 32)
- *   bytes32 evmRecipient       (offset 64, right-justified 20-byte address)
+ *   bytes32 evmRecipient       (offset 64, left-justified: 20-byte address then 12 zero bytes)
  *   uint64  amountBurned       (offset 96)
  *   uint16  targetChainId      (offset 104)
  *   uint64  nonce              (offset 106)
@@ -163,7 +163,7 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
      * Payload layout (matches Anchor program):
      *   [0..32]   bytes32  solanaSourceMint
      *   [32..64]  bytes32  solanaSender
-     *   [64..96]  bytes32  evmRecipient  (address right-justified, 12 zero bytes prefix)
+     *   [64..96]  bytes32  evmRecipient  (address left-justified: 20 address bytes then 12 zero bytes)
      *   [96..104] uint64   amountBurned  (big-endian)
      *   [104..106] uint16  targetChainId (big-endian)
      *   [106..114] uint64  nonce         (big-endian)
@@ -182,7 +182,7 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
             let ptr := payload.offset
             solanaSourceMint := calldataload(ptr)
             solanaSender     := calldataload(add(ptr, 32))
-            // EVM address is the last 20 bytes of the 32-byte field
+            // EVM address is the first 20 bytes of the 32-byte field; shr(96) shifts them right into address position
             evmRecipient     := shr(96, calldataload(add(ptr, 64)))
             amountBurned     := shr(192, calldataload(add(ptr, 96)))
             targetChainId    := shr(240, calldataload(add(ptr, 104)))
