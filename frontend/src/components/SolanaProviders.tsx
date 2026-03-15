@@ -20,7 +20,6 @@ import {
   SolflareWalletAdapter,
   CoinbaseWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
-import { clusterApiUrl } from "@solana/web3.js";
 
 // Import wallet adapter default styles (modal, button, etc.)
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -37,8 +36,7 @@ export function SolanaProviders({ children, isTestnet = false, rpcEndpoint }: Pr
   const endpoint = useMemo(
     () =>
       rpcEndpoint ??
-      (process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-        clusterApiUrl(isTestnet ? "devnet" : "mainnet-beta")),
+      `/api/solana-rpc?network=${isTestnet ? "devnet" : "mainnet-beta"}`,
     [isTestnet, rpcEndpoint]
   );
 

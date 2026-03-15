@@ -4,8 +4,8 @@
 
   "framework": "nextjs",
 
-  "installCommand": "npm install",
-  "buildCommand": "npx turbo run build --filter=@tokenforge/frontend",
+  "installCommand": "cd frontend && npm install",
+  "buildCommand": "cd frontend && npm run build",
   "outputDirectory": "frontend/.next",
 
   "headers": [

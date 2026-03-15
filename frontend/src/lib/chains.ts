@@ -20,8 +20,6 @@ export interface ChainConfig {
   factoryAddress: `0x${string}` | "";
 }
 
-const ALCHEMY_KEY = process.env.NEXT_PUBLIC_ALCHEMY_KEY ?? "";
-
 export const SUPPORTED_CHAINS: ChainConfig[] = [
   // ─── Testnets ──────────────────────────────────────────────────────────────
   {
@@ -29,7 +27,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     name: "Ethereum Sepolia",
     shortName: "sepolia",
     nativeCurrency: { name: "SepoliaETH", symbol: "ETH", decimals: 18 },
-    rpcUrl: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    rpcUrl: "/api/rpc/11155111",
     blockExplorer: "https://sepolia.etherscan.io",
     isTestnet: true,
     factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_SEPOLIA as `0x${string}`) ?? "",
@@ -49,7 +47,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     name: "Polygon Amoy",
     shortName: "polygonAmoy",
     nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 },
-    rpcUrl: `https://polygon-amoy.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    rpcUrl: "/api/rpc/80002",
     blockExplorer: "https://amoy.polygonscan.com",
     isTestnet: true,
     factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_POLYGON_AMOY as `0x${string}`) ?? "",
@@ -59,7 +57,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     name: "Arbitrum Sepolia",
     shortName: "arbitrumSepolia",
     nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-    rpcUrl: `https://arb-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    rpcUrl: "/api/rpc/421614",
     blockExplorer: "https://sepolia.arbiscan.io",
     isTestnet: true,
     factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_ARB_SEPOLIA as `0x${string}`) ?? "",
@@ -69,7 +67,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     name: "Base Sepolia",
     shortName: "baseSepolia",
     nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-    rpcUrl: `https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    rpcUrl: "/api/rpc/84532",
     blockExplorer: "https://sepolia.basescan.org",
     isTestnet: true,
     factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_BASE_SEPOLIA as `0x${string}`) ?? "",
@@ -80,7 +78,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     name: "Ethereum",
     shortName: "mainnet",
     nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
-    rpcUrl: `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    rpcUrl: "/api/rpc/1",
     blockExplorer: "https://etherscan.io",
     isTestnet: false,
     factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_MAINNET as `0x${string}`) ?? "",
@@ -100,7 +98,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     name: "Polygon",
     shortName: "polygon",
     nativeCurrency: { name: "MATIC", symbol: "MATIC", decimals: 18 },
-    rpcUrl: `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    rpcUrl: "/api/rpc/137",
     blockExplorer: "https://polygonscan.com",
     isTestnet: false,
     factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_POLYGON as `0x${string}`) ?? "",
@@ -110,7 +108,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     name: "Arbitrum One",
     shortName: "arbitrum",
     nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-    rpcUrl: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    rpcUrl: "/api/rpc/42161",
     blockExplorer: "https://arbiscan.io",
     isTestnet: false,
     factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_ARBITRUM as `0x${string}`) ?? "",
@@ -120,7 +118,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     name: "Base",
     shortName: "base",
     nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
-    rpcUrl: `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`,
+    rpcUrl: "/api/rpc/8453",
     blockExplorer: "https://basescan.org",
     isTestnet: false,
     factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_BASE as `0x${string}`) ?? "",
