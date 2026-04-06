@@ -12,18 +12,18 @@
     "init:mainnet": "ts-node scripts/deploy.ts mainnet"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.30.1",
-    "@solana/spl-token": "^0.4.9",
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4"
   },
   "devDependencies": {
-    "@types/bn.js": "^5.1.6",
-    "@types/chai": "^4.3.20",
-    "@types/mocha": "^10.0.9",
-    "bn.js": "^5.2.1",
-    "chai": "^4.3.10",
-    "mocha": "^10.7.3",
-    "ts-mocha": "^10.0.0",
-    "typescript": "^5.4.5"
+    "@types/bn.js": "^5.2.0",
+    "@types/chai": "^5.2.3",
+    "@types/mocha": "^10.0.10",
+    "bn.js": "^5.2.3",
+    "chai": "^6.2.2",
+    "mocha": "^11.7.5",
+    "ts-mocha": "^11.1.0",
+    "typescript": "^6.0.2"
   }
 }
