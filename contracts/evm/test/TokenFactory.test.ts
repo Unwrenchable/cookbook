@@ -462,8 +462,11 @@ describe("LPLocker", function () {
 
     // Initialize the mock LP token with user1 as owner
     await lpToken.initialize(
-      "MockLP", "MLP", ethers.parseUnits("1000000", 0), 18,
-      ethers.ZeroAddress, 0, user1.address
+      "MockLP",
+      "MLP",
+      ethers.parseUnits("1000000", 0),
+      18,
+      user1.address
     );
   });
 
