@@ -84,7 +84,7 @@ export function VanityAddressGenerator() {
         <p className="font-semibold text-base mb-1">🔮 Vanity Address Generator</p>
         <p className="text-purple-700">
           Mine a custom EVM wallet address — like <code className="font-mono bg-purple-100 px-1 rounded">0xcafe…</code> or
-          {" "}<code className="font-mono bg-purple-100 px-1 rounded">0xf122…</code> ("fizz" in leet hex).
+          {" "}<code className="font-mono bg-purple-100 px-1 rounded">0xf122…</code> (&quot;fizz&quot; in leet hex).
           Everything runs in your browser. Your private key <strong>never leaves your device.</strong>
         </p>
         <p className="mt-1 text-xs text-purple-600">⚠️ Save your private key immediately when found. It will not be stored anywhere.</p>
@@ -143,12 +143,12 @@ export function VanityAddressGenerator() {
                 onClick={() => setPrefix(prefixLeet)}
                 className="mt-1 text-xs text-purple-600 hover:underline"
               >
-                💡 Use leet hex: <code className="font-mono">{prefixLeet}</code> (closest to "{prefix}")
+                💡 Use leet hex: <code className="font-mono">{prefixLeet}</code> (closest to &quot;{prefix}&quot;)
               </button>
             )}
             {prefix && !prefixOk && !prefixLeet && (
               <p className="mt-1 text-xs text-red-500">
-                Contains non-hex characters that can't be substituted.
+                Contains non-hex characters that can&apos;t be substituted.
                 Valid: <code className="font-mono">0-9 a-f</code>
               </p>
             )}

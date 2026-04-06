@@ -87,7 +87,7 @@ export default function HomePage() {
             {/* Testnet toggle */}
             <button
               type="button"
-              onClick={() => setIsTestnet((v) => !v)}
+              onClick={() => setIsTestnet(!isTestnet)}
               className={`hidden sm:flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border transition-colors ${
                 isTestnet
                   ? "border-yellow-500/40 bg-yellow-500/10 text-yellow-400"

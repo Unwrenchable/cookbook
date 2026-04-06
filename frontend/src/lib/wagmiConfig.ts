@@ -27,7 +27,17 @@ import {
   optimismSepolia,
 } from "wagmi/chains";
 
-const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID ?? "YOUR_WC_PROJECT_ID";
+// Fall back to a placeholder so the module always loads without crashing.
+// WalletConnect connections will fail until a real project ID is set in .env.local.
+// Get one free at https://cloud.walletconnect.com
+const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID || "dev_wc_project_id";
+if (typeof window !== "undefined" && WC_PROJECT_ID === "dev_wc_project_id") {
+  console.warn(
+    "[GOONFORGE] NEXT_PUBLIC_WC_PROJECT_ID is not set. " +
+    "WalletConnect connections will not work. " +
+    "Get a free project ID at https://cloud.walletconnect.com and add it to .env.local."
+  );
+}
 
 export const wagmiConfig = getDefaultConfig({
   appName: "GOONFORGE",
