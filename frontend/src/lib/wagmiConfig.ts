@@ -31,6 +31,12 @@ import {
 // WalletConnect connections will fail until a real project ID is set in .env.local.
 // Get one free at https://cloud.walletconnect.com
 const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID || "dev_wc_project_id";
+
+// During SSR/prerendering, relative URLs (e.g. "/api/rpc/1") are invalid in
+// Node.js fetch. Fall back to http() (chain's built-in public RPC) on the
+// server; use the proxy path in the browser to keep ALCHEMY_KEY server-only.
+const proxyTransport = (browserPath: string) =>
+  typeof window === "undefined" ? http() : http(browserPath);
 if (typeof window !== "undefined" && WC_PROJECT_ID === "dev_wc_project_id") {
   console.warn(
     "[GOONFORGE] NEXT_PUBLIC_WC_PROJECT_ID is not set. " +
@@ -62,16 +68,16 @@ export const wagmiConfig = getDefaultConfig({
   transports: {
     // Route Alchemy-backed chains through the server-side proxy to keep
     // ALCHEMY_KEY out of the browser bundle.
-    [mainnet.id]:          http("/api/rpc/1"),
-    [sepolia.id]:          http("/api/rpc/11155111"),
-    [polygon.id]:          http("/api/rpc/137"),
-    [polygonAmoy.id]:      http("/api/rpc/80002"),
-    [arbitrum.id]:         http("/api/rpc/42161"),
-    [arbitrumSepolia.id]:  http("/api/rpc/421614"),
-    [base.id]:             http("/api/rpc/8453"),
-    [baseSepolia.id]:      http("/api/rpc/84532"),
-    [optimism.id]:         http("/api/rpc/10"),
-    [optimismSepolia.id]:  http("/api/rpc/11155420"),
+    [mainnet.id]:          proxyTransport("/api/rpc/1"),
+    [sepolia.id]:          proxyTransport("/api/rpc/11155111"),
+    [polygon.id]:          proxyTransport("/api/rpc/137"),
+    [polygonAmoy.id]:      proxyTransport("/api/rpc/80002"),
+    [arbitrum.id]:         proxyTransport("/api/rpc/42161"),
+    [arbitrumSepolia.id]:  proxyTransport("/api/rpc/421614"),
+    [base.id]:             proxyTransport("/api/rpc/8453"),
+    [baseSepolia.id]:      proxyTransport("/api/rpc/84532"),
+    [optimism.id]:         proxyTransport("/api/rpc/10"),
+    [optimismSepolia.id]:  proxyTransport("/api/rpc/11155420"),
     // Public-RPC chains use direct transports.
     [bsc.id]:             http("https://bsc-dataseed.binance.org/"),
     [bscTestnet.id]:      http("https://data-seed-prebsc-1-s1.binance.org:8545"),
