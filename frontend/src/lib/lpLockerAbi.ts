@@ -89,17 +89,20 @@ export const LP_LOCKER_ABI = [
 // Structure mirrors chains.ts SUPPORTED_CHAINS chainIds.
 export const LP_LOCKER_ADDRESSES: Record<number, `0x${string}`> = {
   // Testnets
-  11155111: (process.env.NEXT_PUBLIC_LOCKER_SEPOLIA     as `0x${string}`) ?? "0x",
-  97:       (process.env.NEXT_PUBLIC_LOCKER_BSC_TESTNET as `0x${string}`) ?? "0x",
-  421614:   (process.env.NEXT_PUBLIC_LOCKER_ARB_SEPOLIA as `0x${string}`) ?? "0x",
+  11155111: (process.env.NEXT_PUBLIC_LOCKER_SEPOLIA      as `0x${string}`) ?? "0x",
+  97:       (process.env.NEXT_PUBLIC_LOCKER_BSC_TESTNET  as `0x${string}`) ?? "0x",
+  80002:    (process.env.NEXT_PUBLIC_LOCKER_POLYGON_AMOY as `0x${string}`) ?? "0x",
+  421614:   (process.env.NEXT_PUBLIC_LOCKER_ARB_SEPOLIA  as `0x${string}`) ?? "0x",
   84532:    (process.env.NEXT_PUBLIC_LOCKER_BASE_SEPOLIA as `0x${string}`) ?? "0x",
+  11155420: (process.env.NEXT_PUBLIC_LOCKER_OP_SEPOLIA   as `0x${string}`) ?? "0x",
   // Mainnets
-  1:        (process.env.NEXT_PUBLIC_LOCKER_MAINNET     as `0x${string}`) ?? "0x",
-  56:       (process.env.NEXT_PUBLIC_LOCKER_BSC         as `0x${string}`) ?? "0x",
-  137:      (process.env.NEXT_PUBLIC_LOCKER_POLYGON     as `0x${string}`) ?? "0x",
-  42161:    (process.env.NEXT_PUBLIC_LOCKER_ARBITRUM    as `0x${string}`) ?? "0x",
-  8453:     (process.env.NEXT_PUBLIC_LOCKER_BASE        as `0x${string}`) ?? "0x",
-  43114:    (process.env.NEXT_PUBLIC_LOCKER_AVALANCHE   as `0x${string}`) ?? "0x",
+  1:        (process.env.NEXT_PUBLIC_LOCKER_MAINNET      as `0x${string}`) ?? "0x",
+  56:       (process.env.NEXT_PUBLIC_LOCKER_BSC          as `0x${string}`) ?? "0x",
+  137:      (process.env.NEXT_PUBLIC_LOCKER_POLYGON      as `0x${string}`) ?? "0x",
+  42161:    (process.env.NEXT_PUBLIC_LOCKER_ARBITRUM     as `0x${string}`) ?? "0x",
+  8453:     (process.env.NEXT_PUBLIC_LOCKER_BASE         as `0x${string}`) ?? "0x",
+  43114:    (process.env.NEXT_PUBLIC_LOCKER_AVALANCHE    as `0x${string}`) ?? "0x",
+  10:       (process.env.NEXT_PUBLIC_LOCKER_OPTIMISM     as `0x${string}`) ?? "0x",
 };
 
 // ERC20 approve ABI (just what we need for LP token approval)

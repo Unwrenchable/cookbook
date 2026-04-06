@@ -54,7 +54,7 @@ export function useDeployToken() {
 
   // ─── Deploy function ──────────────────────────────────────────────────────
   const deploy = useCallback(
-    async (formData: TokenFormData): Promise<DeployResult> => {
+    async (formData: TokenFormData, referrer?: string): Promise<DeployResult> => {
       if (!userAddress) throw new Error("Wallet not connected");
       if (!factoryAddress) throw new Error(`No factory deployed on chain ${chainId}`);
       if (!publicClient) throw new Error("Public client not available");
@@ -66,28 +66,43 @@ export function useDeployToken() {
       try {
         const fee = launchFee ?? 0n;
 
-        const hash = await writeContractAsync({
-          address:      factoryAddress,
-          abi:          TOKEN_FACTORY_ABI,
-          functionName: "createToken",
-          args: [
-            {
-              name:            formData.name,
-              symbol:          formData.symbol,
-              totalSupply:     BigInt(formData.totalSupply),
-              decimals:        formData.decimals,
-              buyTaxBps:       formData.buyTaxBps,
-              sellTaxBps:      formData.sellTaxBps,
-              burnBps:         formData.burnBps,
-              reflectionBps:   formData.reflectionBps,
-              marketingWallet: (formData.marketingWallet as `0x${string}`) || "0x0000000000000000000000000000000000000000",
-              liquidityBps:    formData.liquidityBps,
-              owner:           userAddress,
-              flavor:          formData.flavor as TokenFlavor,
-            },
-          ],
-          value: fee,
-        });
+        const tokenParams = {
+          name:            formData.name,
+          symbol:          formData.symbol,
+          totalSupply:     BigInt(formData.totalSupply),
+          decimals:        formData.decimals,
+          buyTaxBps:       formData.buyTaxBps,
+          sellTaxBps:      formData.sellTaxBps,
+          burnBps:         formData.burnBps,
+          reflectionBps:   formData.reflectionBps,
+          marketingWallet: (formData.marketingWallet as `0x${string}`) || "0x0000000000000000000000000000000000000000",
+          liquidityBps:    formData.liquidityBps,
+          owner:           userAddress,
+          flavor:          formData.flavor as TokenFlavor,
+        };
+
+        // Use createTokenWithReferral when a valid referrer address is provided
+        const isValidReferrer =
+          referrer &&
+          referrer.startsWith("0x") &&
+          referrer.length === 42 &&
+          referrer.toLowerCase() !== userAddress.toLowerCase();
+
+        const hash = isValidReferrer
+          ? await writeContractAsync({
+              address:      factoryAddress,
+              abi:          TOKEN_FACTORY_ABI,
+              functionName: "createTokenWithReferral",
+              args:         [tokenParams, referrer as `0x${string}`],
+              value:        fee,
+            })
+          : await writeContractAsync({
+              address:      factoryAddress,
+              abi:          TOKEN_FACTORY_ABI,
+              functionName: "createToken",
+              args:         [tokenParams],
+              value:        fee,
+            });
 
         // Wait for receipt using the viem public client directly — avoids the
         // stale-closure issue of reading React state inside an async callback.

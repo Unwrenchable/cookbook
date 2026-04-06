@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId } from "wagmi";
 import { ChainSelector } from "@/components/ChainSelector";
@@ -25,6 +26,10 @@ export default function HomePage() {
   const { isConnected } = useAccount();
   const chainId      = useChainId();
   const chainConfig  = getChainById(chainId);
+  const searchParams = useSearchParams();
+
+  // Read referral address from ?ref= query param
+  const referrer = searchParams?.get("ref") ?? undefined;
 
   const { deploy, isPending, error, deployResult, launchFee } = useDeployToken();
 
@@ -35,7 +40,7 @@ export default function HomePage() {
   async function handleDeploy(formData: TokenFormData) {
     setLastFormData(formData);
     try {
-      await deploy(formData);
+      await deploy(formData, referrer);
     } catch {
       // error captured in hook
     }
@@ -129,6 +134,17 @@ export default function HomePage() {
 
       {/* ─── Main ─────────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+
+        {/* Referral banner — shown when a ?ref= param is present */}
+        {referrer && referrer.startsWith("0x") && referrer.length === 42 && (
+          <div className="rounded-xl border border-brand-500/40 bg-brand-500/10 px-4 py-3 text-sm text-brand-300">
+            🤝 You&apos;re using a referral link from{" "}
+            <code className="font-mono text-brand-400 text-xs">
+              {referrer.slice(0, 6)}…{referrer.slice(-4)}
+            </code>
+            . 20% of your launch fee goes to them — no extra cost to you.
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="flex gap-1 rounded-xl border border-dark-border bg-dark-card p-1 w-fit flex-wrap">
