@@ -4,6 +4,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId } from "wagmi";
 import { ChainSelector } from "@/components/ChainSelector";
@@ -17,6 +18,7 @@ import { SwapWidget } from "@/components/SwapWidget";
 import { ReferralPanel } from "@/components/ReferralPanel";
 import { useDeployToken } from "@/hooks/useDeployToken";
 import { getChainById } from "@/lib/chains";
+import { useNetwork } from "@/lib/networkContext";
 import type { TokenFormData } from "@/lib/types";
 
 type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "vanity" | "dashboard" | "referral";
@@ -25,17 +27,21 @@ export default function HomePage() {
   const { isConnected } = useAccount();
   const chainId      = useChainId();
   const chainConfig  = getChainById(chainId);
+  const searchParams = useSearchParams();
+
+  // Read referral address from ?ref= query param
+  const referrer = searchParams?.get("ref") ?? undefined;
 
   const { deploy, isPending, error, deployResult, launchFee } = useDeployToken();
 
+  const { isTestnet, setIsTestnet } = useNetwork();
   const [activeTab,  setActiveTab]  = useState<Tab>("evm");
-  const [isTestnet,  setIsTestnet]  = useState(false);
   const [lastFormData, setLastFormData] = useState<TokenFormData | null>(null);
 
   async function handleDeploy(formData: TokenFormData) {
     setLastFormData(formData);
     try {
-      await deploy(formData);
+      await deploy(formData, referrer);
     } catch {
       // error captured in hook
     }
@@ -115,7 +121,7 @@ export default function HomePage() {
           </p>
           {/* Chain pills */}
           <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs">
-            {["Ethereum", "BSC", "Polygon", "Arbitrum", "Base", "Avalanche", "Solana"].map((c) => (
+            {["Ethereum", "BSC", "Polygon", "Arbitrum", "Base", "Optimism", "Avalanche", "Solana"].map((c) => (
               <span
                 key={c}
                 className="rounded-full border border-dark-border bg-dark-card px-3 py-1 text-gray-400"
@@ -129,6 +135,17 @@ export default function HomePage() {
 
       {/* ─── Main ─────────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-5xl px-4 py-8 space-y-6">
+
+        {/* Referral banner — shown when a ?ref= param is present */}
+        {referrer && referrer.startsWith("0x") && referrer.length === 42 && (
+          <div className="rounded-xl border border-brand-500/40 bg-brand-500/10 px-4 py-3 text-sm text-brand-300">
+            🤝 You{"'"}re using a referral link from{" "}
+            <code className="font-mono text-brand-400 text-xs">
+              {referrer.slice(0, 6)}…{referrer.slice(-4)}
+            </code>
+            . A share of your launch fee goes to them — no extra cost to you.
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="flex gap-1 rounded-xl border border-dark-border bg-dark-card p-1 w-fit flex-wrap">

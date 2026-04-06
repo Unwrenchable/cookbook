@@ -133,6 +133,26 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     isTestnet: false,
     factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_AVALANCHE as `0x${string}`) ?? "",
   },
+  {
+    id: 10,
+    name: "Optimism",
+    shortName: "optimism",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrl: "/api/rpc/10",
+    blockExplorer: "https://optimistic.etherscan.io",
+    isTestnet: false,
+    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_OPTIMISM as `0x${string}`) ?? "",
+  },
+  {
+    id: 11155420,
+    name: "Optimism Sepolia",
+    shortName: "opSepolia",
+    nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+    rpcUrl: "/api/rpc/11155420",
+    blockExplorer: "https://sepolia-optimism.etherscan.io",
+    isTestnet: true,
+    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_OP_SEPOLIA as `0x${string}`) ?? "",
+  },
 ];
 
 export const TESTNET_CHAINS  = SUPPORTED_CHAINS.filter((c) => c.isTestnet);

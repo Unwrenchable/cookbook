@@ -9,6 +9,7 @@ const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "";
 const BSCSCAN_API_KEY = process.env.BSCSCAN_API_KEY || "";
 const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY || "";
+const OPSCAN_API_KEY = process.env.OPSCAN_API_KEY || "";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -91,6 +92,16 @@ const config: HardhatUserConfig = {
       accounts: [PRIVATE_KEY],
       chainId: 43114,
     },
+    optimism: {
+      url: `https://opt-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+      accounts: [PRIVATE_KEY],
+      chainId: 10,
+    },
+    optimismSepolia: {
+      url: `https://opt-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+      accounts: [PRIVATE_KEY],
+      chainId: 11155420,
+    },
   },
   etherscan: {
     apiKey: {
@@ -102,6 +113,8 @@ const config: HardhatUserConfig = {
       polygonMumbai: POLYGONSCAN_API_KEY,
       arbitrumOne: process.env.ARBISCAN_API_KEY || "",
       base: process.env.BASESCAN_API_KEY || "",
+      optimisticEthereum: OPSCAN_API_KEY,
+      optimismSepolia: OPSCAN_API_KEY,
     },
   },
   gasReporter: {

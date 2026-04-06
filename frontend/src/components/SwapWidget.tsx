@@ -16,24 +16,27 @@ const SWAP_DEADLINE_SECONDS = 300; // 5 minutes
 interface DexConfig {
   name:    string;
   logo:    string;
-  url:     (tokenIn: string, tokenOut: string, chain: DexChainKey) => string;
+  url:     (tokenIn: string, tokenOut: string) => string;
   chains:  number[];
 }
 
-type DexChainKey = "ethereum" | "bsc" | "polygon" | "arbitrum" | "base" | "avalanche";
+type DexChainKey = "ethereum" | "bsc" | "polygon" | "arbitrum" | "base" | "avalanche" | "optimism";
 
 const CHAIN_ID_TO_DEX_KEY: Record<number, DexChainKey> = {
-  1:     "ethereum",
+  1:        "ethereum",
   11155111: "ethereum",
-  56:    "bsc",
-  97:    "bsc",
-  137:   "polygon",
-  80001: "polygon",
-  42161: "arbitrum",
-  421614:"arbitrum",
-  8453:  "base",
-  84532: "base",
-  43114: "avalanche",
+  56:       "bsc",
+  97:       "bsc",
+  137:      "polygon",
+  80001:    "polygon", // Mumbai testnet — deprecated/shut down; kept for historical data compatibility only
+  80002:    "polygon", // Amoy (current Polygon testnet)
+  42161:    "arbitrum",
+  421614:   "arbitrum",
+  8453:     "base",
+  84532:    "base",
+  43114:    "avalanche",
+  10:       "optimism",
+  11155420: "optimism",
 };
 
 // Native / common token addresses per chain (for the "from" default)
@@ -44,17 +47,16 @@ const NATIVE_WRAPPED: Record<DexChainKey, string> = {
   arbitrum:  "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", // WETH
   base:      "0x4200000000000000000000000000000000000006", // WETH
   avalanche: "0xB31f66AA3C1e785363F0875A1B74E27b85FD66c7", // WAVAX
+  optimism:  "0x4200000000000000000000000000000000000006", // WETH
 };
 
 const DEXES: DexConfig[] = [
   {
     name:   "Uniswap",
     logo:   "🦄",
-    chains: [1, 11155111, 137, 80001, 42161, 421614, 8453, 84532],
-    url: (tokenIn, tokenOut, chain) => {
-      const base = chain === "base" ? "https://app.uniswap.org/swap" : "https://app.uniswap.org/swap";
-      return `${base}?inputCurrency=${tokenIn}&outputCurrency=${tokenOut}`;
-    },
+    chains: [1, 11155111, 137, 80001, 42161, 421614, 8453, 84532, 10, 11155420],
+    url: (tokenIn, tokenOut) =>
+      `https://app.uniswap.org/swap?inputCurrency=${tokenIn}&outputCurrency=${tokenOut}`,
   },
   {
     name:   "PancakeSwap",
@@ -90,6 +92,13 @@ const DEXES: DexConfig[] = [
     chains: [8453, 84532],
     url: (tokenIn, tokenOut) =>
       `https://aerodrome.finance/swap?from=${tokenIn}&to=${tokenOut}`,
+  },
+  {
+    name:   "Velodrome",
+    logo:   "🎡",
+    chains: [10, 11155420],
+    url: (tokenIn, tokenOut) =>
+      `https://velodrome.finance/swap?from=${tokenIn}&to=${tokenOut}`,
   },
 ];
 
@@ -359,7 +368,6 @@ export function SwapWidget() {
                   const href = dex.url(
                     tokenIn  || nativeWrapped,
                     tokenOut || nativeWrapped,
-                    dexKey,
                   );
                   return (
                     <a

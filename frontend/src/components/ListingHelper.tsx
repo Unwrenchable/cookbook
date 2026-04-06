@@ -34,14 +34,19 @@ const LISTINGS = [
 ];
 
 const CHAIN_NAMES: Record<number, string> = {
-  1: "Ethereum",
+  1:        "Ethereum",
   11155111: "Sepolia",
-  56: "BSC",
-  97: "BSC Testnet",
-  137: "Polygon",
-  42161: "Arbitrum",
-  8453: "Base",
-  43114: "Avalanche",
+  56:       "BSC",
+  97:       "BSC Testnet",
+  137:      "Polygon",
+  80002:    "Polygon Amoy",
+  42161:    "Arbitrum One",
+  421614:   "Arbitrum Sepolia",
+  8453:     "Base",
+  84532:    "Base Sepolia",
+  43114:    "Avalanche",
+  10:       "Optimism",
+  11155420: "Optimism Sepolia",
 };
 
 export function ListingHelper({ tokenAddress, chainId, tokenName, tokenSymbol }: Props) {
