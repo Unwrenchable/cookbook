@@ -4,40 +4,21 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
+// ─── Interfaces (Moved outside the contract) ──────────────────────────────────
+
+/**
+ * @dev Minimal interface for the minted token. 
+ * This must be outside the contract block to satisfy the Solidity parser.
+ */
+interface IMintable {
+    function mint(address to, uint256 amount) external;
+}
+
 /**
  * @title BurnBridgeReceiver
  * @notice EVM side of the TokenForge cross-chain burn-to-activate mechanic.
- *
- * Flow:
- *  1. User burns SPL tokens on Solana via the `token-burn-bridge` Anchor program.
- *  2. Wormhole guardians produce a VAA (Verified Action Approval).
- *  3. Anyone (or an auto-relayer) calls `receiveMessage(encodedVAA)` here.
- *  4. This contract verifies the VAA, ensures it has not been replayed,
- *     and mints the corresponding ERC20 tokens to the recipient.
- *
- * Wormhole VAA body format (as packed by the Anchor program):
- *   bytes32 solanaSourceMint   (offset 0)
- *   bytes32 solanaSender       (offset 32)
- *   bytes32 evmRecipient       (offset 64, left-justified: 20-byte address then 12 zero bytes)
- *   uint64  amountBurned       (offset 96)
- *   uint16  targetChainId      (offset 104)
- *   uint64  nonce              (offset 106)
- *
- * @dev In a production deployment this contract should:
- *      1. Import and use the official Wormhole IWormhole interface.
- *      2. Call `IWormhole(wormholeCore).parseAndVerifyVM(encodedVAA)` to validate.
- *      3. Use the wormhole emitter address + sequence for replay prevention.
- *      The current implementation uses a trusted-relayer model as a scaffold
- *      until Wormhole dependencies are pinned.
  */
 contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
-
-    // ─── Interfaces ───────────────────────────────────────────────────────────
-
-    /// Minimal interface for the minted token
-    interface IMintable {
-        function mint(address to, uint256 amount) external;
-    }
 
     // ─── State ────────────────────────────────────────────────────────────────
 
@@ -51,22 +32,18 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
     uint16  public immutable thisChainId;
 
     /// The Solana program ID (emitter address) that is allowed to send messages.
-    /// Stored as bytes32 (Solana pubkey).
     bytes32 public trustedSolanaEmitter;
 
     /// The ERC20 token that will be minted on successful bridge calls.
-    /// Must grant MINTER_ROLE (or equivalent) to this contract.
     address public mintableToken;
 
     /// Minting ratio: EVM tokens minted per 1 raw Solana token unit.
-    /// Example: if Solana token has 9 decimals and EVM token has 18 decimals,
-    /// set ratio = 1e9 so burning 1 full Solana token mints 1 full EVM token.
     uint256 public mintRatio;
 
     /// Replay prevention: tracks processed (emitter, sequence) pairs
     mapping(bytes32 => bool) public processedMessages;
 
-    /// Trusted off-chain relayers (used during development / before full Wormhole integration)
+    /// Trusted off-chain relayers
     mapping(address => bool) public isTrustedRelayer;
 
     // ─── Events ───────────────────────────────────────────────────────────────
@@ -107,60 +84,14 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
 
     // ─── Core: receive message ────────────────────────────────────────────────
 
-    /**
-     * @notice Submit a Wormhole VAA to activate (mint) tokens on this chain.
-     *
-     * ⚠️  NOT YET IMPLEMENTED — Wormhole VAA parsing is commented out pending
-     * dependency pinning.  This function reverts to prevent accidental use in
-     * production without on-chain verification.
-     *
-     * During development / integration testing use `receiveRelayedMessage`
-     * instead, which is protected by the trusted-relayer whitelist.
-     *
-     * Production implementation should:
-     *   1. Parse and verify: IWormhole(wormholeCore).parseAndVerifyVM(encodedVAA)
-     *   2. Validate emitter chain and address against SOLANA_CHAIN_ID /
-     *      trustedSolanaEmitter.
-     *   3. Use vm.emitterChainId + vm.emitterAddress + vm.sequence as
-     *      the replay-prevention key in processedMessages.
-     *   4. Call _processPayload(vm.payload).
-     *
-     * @param encodedVAA The full encoded Wormhole VAA bytes.
-     */
     function receiveMessage(bytes calldata encodedVAA) external nonReentrant {
-        // Wormhole VAA verification is not yet integrated.
-        // Calling this in its current unverified state would allow anyone to
-        // mint arbitrary tokens by submitting a crafted payload, so we revert
-        // explicitly until the integration is complete.
+        // Reverts explicitly until Wormhole dependencies are pinned and integrated.
         revert("BurnBridgeReceiver: Wormhole VAA verification not implemented; use receiveRelayedMessage");
-
-        // ── Production implementation (uncomment & remove the revert above) ─────
-        //
-        // (IWormhole.VM memory vm, bool valid, string memory reason)
-        //     = IWormhole(wormholeCore).parseAndVerifyVM(encodedVAA);
-        // require(valid, reason);
-        // require(vm.emitterChainId == SOLANA_CHAIN_ID,    "BurnBridgeReceiver: wrong emitter chain");
-        // require(vm.emitterAddress == trustedSolanaEmitter, "BurnBridgeReceiver: untrusted emitter");
-        //
-        // bytes32 messageKey = keccak256(
-        //     abi.encodePacked(vm.emitterChainId, vm.emitterAddress, vm.sequence)
-        // );
-        // require(!processedMessages[messageKey], "BurnBridgeReceiver: already processed");
-        // processedMessages[messageKey] = true;
-        //
-        // _processPayload(vm.payload);
-        //
-        // Suppress unused-variable warning in scaffold build:
+        
+        // This is to suppress the unused variable warning for the scaffold
         encodedVAA;
     }
 
-    /**
-     * @notice Trusted-relayer path for development / integration testing.
-     *         The relayer decodes the VAA off-chain and submits the raw payload.
-     *
-     * @param payload     The decoded VAA payload bytes.
-     * @param messageKey  keccak256(emitterChain, emitterAddress, sequence) for replay prevention.
-     */
     function receiveRelayedMessage(
         bytes calldata payload,
         bytes32        messageKey
@@ -174,17 +105,6 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
 
     // ─── Internal ─────────────────────────────────────────────────────────────
 
-    /**
-     * @dev Decode the payload and mint tokens to the recipient.
-     *
-     * Payload layout (matches Anchor program):
-     *   [0..32]   bytes32  solanaSourceMint
-     *   [32..64]  bytes32  solanaSender
-     *   [64..96]  bytes32  evmRecipient  (address left-justified: 20 address bytes then 12 zero bytes)
-     *   [96..104] uint64   amountBurned  (big-endian)
-     *   [104..106] uint16  targetChainId (big-endian)
-     *   [106..114] uint64  nonce         (big-endian)
-     */
     function _processPayload(bytes calldata payload) internal {
         require(payload.length >= 114, "BurnBridgeReceiver: payload too short");
 
@@ -195,19 +115,31 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
         uint16  targetChainId;
         uint64  nonce;
 
+        // Using assembly to pull specific bytes from the payload
         assembly {
             let ptr := payload.offset
             solanaSourceMint := calldataload(ptr)
             solanaSender     := calldataload(add(ptr, 32))
-            // EVM address is the first 20 bytes of the 32-byte field; shr(96) shifts them right into address position
+            
+            // Recipient is 32 bytes in payload, but EVM address is 20 bytes.
+            // We load the 32 bytes and shift right to get the address.
             evmRecipient     := shr(96, calldataload(add(ptr, 64)))
+            
+            // amountBurned (8 bytes) starts at offset 96. 
+            // We load the 32-byte word starting there and shift right 192 bits (24 bytes).
             amountBurned     := shr(192, calldataload(add(ptr, 96)))
+            
+            // targetChainId (2 bytes) starts at offset 104.
+            // Shift right 240 bits (30 bytes).
             targetChainId    := shr(240, calldataload(add(ptr, 104)))
+            
+            // nonce (8 bytes) starts at offset 106.
+            // Shift right 192 bits (24 bytes).
             nonce            := shr(192, calldataload(add(ptr, 106)))
         }
 
-        require(evmRecipient != address(0),                               "BurnBridgeReceiver: zero recipient");
-        require(targetChainId == thisChainId || targetChainId == 0,       "BurnBridgeReceiver: wrong target chain");
+        require(evmRecipient != address(0), "BurnBridgeReceiver: zero recipient");
+        require(targetChainId == thisChainId || targetChainId == 0, "BurnBridgeReceiver: wrong target chain");
 
         uint256 mintAmount = uint256(amountBurned) * mintRatio;
         require(mintAmount > 0, "BurnBridgeReceiver: zero mint amount");
