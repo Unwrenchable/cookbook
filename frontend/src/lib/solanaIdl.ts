@@ -14,7 +14,10 @@
  * Set NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID in .env.local after deploying.
  */
 export const TOKEN_BURN_BRIDGE_PROGRAM_ID =
-  process.env.NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID ??
+  // `||` instead of `??` so an empty-string env var also falls back to the
+  // System program placeholder (safe no-op address used until `anchor deploy`
+  // provides a real program ID).
+  process.env.NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID ||
   "11111111111111111111111111111111";
 
 // ─── Anchor PDA seeds (must match lib.rs constants) ───────────────────────────

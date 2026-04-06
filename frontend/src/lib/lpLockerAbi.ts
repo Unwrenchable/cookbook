@@ -87,22 +87,26 @@ export const LP_LOCKER_ABI = [
 
 // Placeholder locker addresses — replace with deployed addresses.
 // Structure mirrors chains.ts SUPPORTED_CHAINS chainIds.
+//
+// Note: uses `|| "0x"` (not `??`) so both undefined AND empty-string env vars
+// fall back to the sentinel "0x" value. LPLockerPanel guards against "0x" to
+// show the "not deployed on this chain" message.
 export const LP_LOCKER_ADDRESSES: Record<number, `0x${string}`> = {
   // Testnets
-  11155111: (process.env.NEXT_PUBLIC_LOCKER_SEPOLIA      as `0x${string}`) ?? "0x",
-  97:       (process.env.NEXT_PUBLIC_LOCKER_BSC_TESTNET  as `0x${string}`) ?? "0x",
-  80002:    (process.env.NEXT_PUBLIC_LOCKER_POLYGON_AMOY as `0x${string}`) ?? "0x",
-  421614:   (process.env.NEXT_PUBLIC_LOCKER_ARB_SEPOLIA  as `0x${string}`) ?? "0x",
-  84532:    (process.env.NEXT_PUBLIC_LOCKER_BASE_SEPOLIA as `0x${string}`) ?? "0x",
-  11155420: (process.env.NEXT_PUBLIC_LOCKER_OP_SEPOLIA   as `0x${string}`) ?? "0x",
+  11155111: ((process.env.NEXT_PUBLIC_LOCKER_SEPOLIA      || "0x") as `0x${string}`),
+  97:       ((process.env.NEXT_PUBLIC_LOCKER_BSC_TESTNET  || "0x") as `0x${string}`),
+  80002:    ((process.env.NEXT_PUBLIC_LOCKER_POLYGON_AMOY || "0x") as `0x${string}`),
+  421614:   ((process.env.NEXT_PUBLIC_LOCKER_ARB_SEPOLIA  || "0x") as `0x${string}`),
+  84532:    ((process.env.NEXT_PUBLIC_LOCKER_BASE_SEPOLIA || "0x") as `0x${string}`),
+  11155420: ((process.env.NEXT_PUBLIC_LOCKER_OP_SEPOLIA   || "0x") as `0x${string}`),
   // Mainnets
-  1:        (process.env.NEXT_PUBLIC_LOCKER_MAINNET      as `0x${string}`) ?? "0x",
-  56:       (process.env.NEXT_PUBLIC_LOCKER_BSC          as `0x${string}`) ?? "0x",
-  137:      (process.env.NEXT_PUBLIC_LOCKER_POLYGON      as `0x${string}`) ?? "0x",
-  42161:    (process.env.NEXT_PUBLIC_LOCKER_ARBITRUM     as `0x${string}`) ?? "0x",
-  8453:     (process.env.NEXT_PUBLIC_LOCKER_BASE         as `0x${string}`) ?? "0x",
-  43114:    (process.env.NEXT_PUBLIC_LOCKER_AVALANCHE    as `0x${string}`) ?? "0x",
-  10:       (process.env.NEXT_PUBLIC_LOCKER_OPTIMISM     as `0x${string}`) ?? "0x",
+  1:        ((process.env.NEXT_PUBLIC_LOCKER_MAINNET      || "0x") as `0x${string}`),
+  56:       ((process.env.NEXT_PUBLIC_LOCKER_BSC          || "0x") as `0x${string}`),
+  137:      ((process.env.NEXT_PUBLIC_LOCKER_POLYGON      || "0x") as `0x${string}`),
+  42161:    ((process.env.NEXT_PUBLIC_LOCKER_ARBITRUM     || "0x") as `0x${string}`),
+  8453:     ((process.env.NEXT_PUBLIC_LOCKER_BASE         || "0x") as `0x${string}`),
+  43114:    ((process.env.NEXT_PUBLIC_LOCKER_AVALANCHE    || "0x") as `0x${string}`),
+  10:       ((process.env.NEXT_PUBLIC_LOCKER_OPTIMISM     || "0x") as `0x${string}`),
 };
 
 // ERC20 approve ABI (just what we need for LP token approval)

@@ -30,7 +30,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/11155111",
     blockExplorer: "https://sepolia.etherscan.io",
     isTestnet: true,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_SEPOLIA as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_SEPOLIA || "") as `0x${string}`),
   },
   {
     id: 97,
@@ -40,7 +40,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "https://data-seed-prebsc-1-s1.binance.org:8545",
     blockExplorer: "https://testnet.bscscan.com",
     isTestnet: true,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_BSC_TESTNET as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_BSC_TESTNET || "") as `0x${string}`),
   },
   {
     id: 80002,
@@ -50,7 +50,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/80002",
     blockExplorer: "https://amoy.polygonscan.com",
     isTestnet: true,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_POLYGON_AMOY as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_POLYGON_AMOY || "") as `0x${string}`),
   },
   {
     id: 421614,
@@ -60,7 +60,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/421614",
     blockExplorer: "https://sepolia.arbiscan.io",
     isTestnet: true,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_ARB_SEPOLIA as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_ARB_SEPOLIA || "") as `0x${string}`),
   },
   {
     id: 84532,
@@ -70,7 +70,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/84532",
     blockExplorer: "https://sepolia.basescan.org",
     isTestnet: true,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_BASE_SEPOLIA as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_BASE_SEPOLIA || "") as `0x${string}`),
   },
   // ─── Mainnets ─────────────────────────────────────────────────────────────
   {
@@ -81,7 +81,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/1",
     blockExplorer: "https://etherscan.io",
     isTestnet: false,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_MAINNET as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_MAINNET || "") as `0x${string}`),
   },
   {
     id: 56,
@@ -91,7 +91,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "https://bsc-dataseed.binance.org/",
     blockExplorer: "https://bscscan.com",
     isTestnet: false,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_BSC as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_BSC || "") as `0x${string}`),
   },
   {
     id: 137,
@@ -101,7 +101,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/137",
     blockExplorer: "https://polygonscan.com",
     isTestnet: false,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_POLYGON as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_POLYGON || "") as `0x${string}`),
   },
   {
     id: 42161,
@@ -111,7 +111,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/42161",
     blockExplorer: "https://arbiscan.io",
     isTestnet: false,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_ARBITRUM as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_ARBITRUM || "") as `0x${string}`),
   },
   {
     id: 8453,
@@ -121,7 +121,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/8453",
     blockExplorer: "https://basescan.org",
     isTestnet: false,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_BASE as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_BASE || "") as `0x${string}`),
   },
   {
     id: 43114,
@@ -131,7 +131,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "https://api.avax.network/ext/bc/C/rpc",
     blockExplorer: "https://snowtrace.io",
     isTestnet: false,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_AVALANCHE as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_AVALANCHE || "") as `0x${string}`),
   },
   {
     id: 10,
@@ -141,7 +141,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/10",
     blockExplorer: "https://optimistic.etherscan.io",
     isTestnet: false,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_OPTIMISM as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_OPTIMISM || "") as `0x${string}`),
   },
   {
     id: 11155420,
@@ -151,7 +151,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     rpcUrl: "/api/rpc/11155420",
     blockExplorer: "https://sepolia-optimism.etherscan.io",
     isTestnet: true,
-    factoryAddress: (process.env.NEXT_PUBLIC_FACTORY_OP_SEPOLIA as `0x${string}`) ?? "",
+    factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_OP_SEPOLIA || "") as `0x${string}`),
   },
 ];
 
