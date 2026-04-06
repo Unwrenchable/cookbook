@@ -35,8 +35,8 @@ const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID || "dev_wc_project_i
 // During SSR/prerendering, relative URLs (e.g. "/api/rpc/1") are invalid in
 // Node.js fetch. Fall back to http() (chain's built-in public RPC) on the
 // server; use the proxy path in the browser to keep ALCHEMY_KEY server-only.
-const proxyTransport = (path: string) =>
-  typeof window === "undefined" ? http() : http(path);
+const proxyTransport = (browserPath: string) =>
+  typeof window === "undefined" ? http() : http(browserPath);
 if (typeof window !== "undefined" && WC_PROJECT_ID === "dev_wc_project_id") {
   console.warn(
     "[GOONFORGE] NEXT_PUBLIC_WC_PROJECT_ID is not set. " +
