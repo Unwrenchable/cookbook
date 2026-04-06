@@ -4,6 +4,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import Image from "next/image";
 
 interface Props {
   tokenName?: string;
@@ -75,7 +76,7 @@ export function IpfsUpload({ tokenName = "", tokenSymbol = "", onUploaded }: Pro
         className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-dark-border bg-dark-muted p-6 hover:border-brand-500 transition-colors"
       >
         {preview ? (
-          <img src={preview} alt="preview" className="h-24 w-24 rounded-full object-cover" />
+          <Image src={preview} alt="preview" width={96} height={96} className="h-24 w-24 rounded-full object-cover" />
         ) : (
           <span className="text-4xl">🖼️</span>
         )}
