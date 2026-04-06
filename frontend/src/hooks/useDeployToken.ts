@@ -1,8 +1,10 @@
 /**
  * useDeployToken.ts – Hook that encapsulates the full token deployment flow:
  *   1. Read the launch fee from the factory.
- *   2. Call `createToken` on the factory with the user's params.
- *   3. Wait for the transaction receipt via the public client (not React state).
+ *   2. Call `createToken` (or `createTokenWithReferral`) on the factory.
+ *   3. Wait for the transaction receipt via the viem public client directly,
+ *      avoiding the stale-closure bug that occurs when reading wagmi's
+ *      `useWaitForTransactionReceipt` state inside an async callback.
  *   4. Parse the TokenCreated event to return the new token address.
  */
 "use client";
@@ -117,7 +119,7 @@ export function useDeployToken() {
           try {
             const decoded = decodeEventLog({ abi: [tokenCreatedAbi], ...log });
             if (decoded.eventName === "TokenCreated") {
-              tokenAddress = (decoded.args as { tokenAddress: `0x${string}` }).tokenAddress;
+              tokenAddress = (decoded.args as { tokenAddress: `0x${string}`; tokenOwner: `0x${string}` }).tokenAddress;
               break;
             }
           } catch {

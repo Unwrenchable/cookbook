@@ -28,7 +28,7 @@ const CHAIN_ID_TO_DEX_KEY: Record<number, DexChainKey> = {
   56:       "bsc",
   97:       "bsc",
   137:      "polygon",
-  80001:    "polygon", // legacy Mumbai testnet — kept for backwards compatibility
+  80001:    "polygon", // Mumbai testnet — deprecated/shut down; kept for historical data compatibility only
   80002:    "polygon", // Amoy (current Polygon testnet)
   42161:    "arbitrum",
   421614:   "arbitrum",
