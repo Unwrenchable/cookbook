@@ -115,7 +115,7 @@ export default function HomePage() {
           </p>
           {/* Chain pills */}
           <div className="mt-6 flex flex-wrap justify-center gap-2 text-xs">
-            {["Ethereum", "BSC", "Polygon", "Arbitrum", "Base", "Avalanche", "Solana"].map((c) => (
+            {["Ethereum", "BSC", "Polygon", "Arbitrum", "Base", "Optimism", "Avalanche", "Solana"].map((c) => (
               <span
                 key={c}
                 className="rounded-full border border-dark-border bg-dark-card px-3 py-1 text-gray-400"

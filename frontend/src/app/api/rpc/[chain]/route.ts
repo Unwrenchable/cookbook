@@ -18,6 +18,8 @@ const ALCHEMY_NETWORKS: Record<string, string> = {
   "421614":   "arb-sepolia",
   "8453":     "base-mainnet",
   "84532":    "base-sepolia",
+  "10":       "opt-mainnet",
+  "11155420": "opt-sepolia",
 };
 
 export async function POST(
