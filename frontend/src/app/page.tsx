@@ -18,6 +18,7 @@ import { SwapWidget } from "@/components/SwapWidget";
 import { ReferralPanel } from "@/components/ReferralPanel";
 import { useDeployToken } from "@/hooks/useDeployToken";
 import { getChainById } from "@/lib/chains";
+import { useNetwork } from "@/lib/networkContext";
 import type { TokenFormData } from "@/lib/types";
 
 type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "vanity" | "dashboard" | "referral";
@@ -33,8 +34,8 @@ export default function HomePage() {
 
   const { deploy, isPending, error, deployResult, launchFee } = useDeployToken();
 
+  const { isTestnet, setIsTestnet } = useNetwork();
   const [activeTab,  setActiveTab]  = useState<Tab>("evm");
-  const [isTestnet,  setIsTestnet]  = useState(false);
   const [lastFormData, setLastFormData] = useState<TokenFormData | null>(null);
 
   async function handleDeploy(formData: TokenFormData) {
