@@ -18,7 +18,7 @@ export function ChainSelector() {
     <div className="flex flex-col gap-3">
       {/* Testnet / Mainnet toggle */}
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-gray-700">Network:</span>
+        <span className="text-sm font-medium text-gray-300">Network:</span>
         <button
           type="button"
           onClick={() => setShowTestnets((v) => !v)}
@@ -33,7 +33,7 @@ export function ChainSelector() {
             }`}
           />
         </button>
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-400">
           {showTestnets ? "🧪 Testnet" : "🟢 Mainnet"}
         </span>
       </div>
@@ -50,13 +50,13 @@ export function ChainSelector() {
               onClick={() => switchChain({ chainId: chain.id })}
               className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
                 isActive
-                  ? "border-brand-500 bg-brand-50 text-brand-700"
-                  : "border-gray-200 bg-white text-gray-700 hover:border-brand-300 hover:bg-brand-50"
+                  ? "border-brand-500 bg-brand-500/10 text-brand-300"
+                  : "border-dark-border bg-dark-card text-gray-300 hover:border-brand-500/50 hover:bg-dark-muted"
               } disabled:opacity-50`}
             >
               <span>{chain.name}</span>
               {!chain.factoryAddress && (
-                <span className="ml-auto rounded bg-gray-100 px-1 text-xs text-gray-400">
+                <span className="ml-auto rounded bg-dark-muted px-1 text-xs text-gray-500">
                   soon
                 </span>
               )}

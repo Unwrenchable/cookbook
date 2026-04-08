@@ -55,15 +55,26 @@ function HomePageContent() {
     }
   }
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: "evm",           label: "🚀 Launch"             },
-    { id: "solana-bridge", label: "🔥 Solana Bridge"       },
-    { id: "lock",          label: "🔒 Lock LP"             },
-    { id: "swap",          label: "💱 Swap"                },
-    { id: "vanity",        label: "🔮 Vanity Address"      },
-    { id: "dashboard",     label: "📋 My Tokens"           },
-    { id: "referral",      label: "🤝 Referral"            },
+  const primaryTabs: { id: Tab; label: string }[] = [
+    { id: "evm",           label: "🚀 Launch" },
+    { id: "solana-bridge", label: "🔥 Bridge" },
+    { id: "swap",          label: "💱 Swap" },
+    { id: "dashboard",     label: "📋 My Tokens" },
   ];
+
+  const toolTabs: { id: Tab; label: string }[] = [
+    { id: "lock",      label: "🔒 Lock LP" },
+    { id: "vanity",    label: "🔮 Vanity" },
+    { id: "referral",  label: "🤝 Referral" },
+  ];
+
+  const evmStep = deployResult
+    ? 4
+    : isPending
+      ? 3
+      : isConnected
+        ? 2
+        : 1;
 
   return (
     <div className="min-h-screen bg-dark-bg text-white">
@@ -155,70 +166,112 @@ function HomePageContent() {
           </div>
         )}
 
-        {/* Tab bar */}
-        <div className="flex gap-1 rounded-xl border border-dark-border bg-dark-card p-1 w-fit flex-wrap">
-          {tabs.map(({ id, label }) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setActiveTab(id)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap ${
-                activeTab === id
-                  ? "bg-brand-600 text-white shadow-sm"
-                  : "text-gray-400 hover:text-white"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        {/* Navigation */}
+        <div className="space-y-3">
+          <div className="overflow-x-auto">
+            <div className="inline-flex min-w-full gap-1 rounded-xl border border-dark-border bg-dark-card p-1 sm:min-w-0">
+              {primaryTabs.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTab(id)}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap ${
+                    activeTab === id
+                      ? "bg-brand-600 text-white shadow-sm"
+                      : "text-gray-400 hover:bg-dark-muted hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto">
+            <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Tools</span>
+            <div className="inline-flex gap-1 rounded-xl border border-dark-border bg-dark-card p-1">
+              {toolTabs.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setActiveTab(id)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                    activeTab === id
+                      ? "bg-brand-600 text-white shadow-sm"
+                      : "text-gray-400 hover:bg-dark-muted hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* ── EVM Launch ──────────────────────────────────────────────────── */}
         {activeTab === "evm" && (
-          <div className="grid gap-6 lg:grid-cols-3">
-            <div className="space-y-4">
-              <SectionTitle>1. Select Network</SectionTitle>
-              <Card>
-                <ChainSelector />
-              </Card>
-            </div>
-            <div className="lg:col-span-2 space-y-4">
-              <SectionTitle>2. Configure &amp; Deploy</SectionTitle>
-              {!isConnected ? (
-                <Card className="p-10 text-center space-y-3">
-                  <p className="text-gray-400 text-sm">Connect your wallet to get started.</p>
-                  <ConnectButton />
-                </Card>
-              ) : deployResult ? (
-                <DeployResult
-                  result={deployResult}
-                  chainId={chainId}
-                  onReset={() => window.location.reload()}
-                  tokenName={lastFormData?.name}
-                  tokenSymbol={lastFormData?.symbol}
-                  ownerAddress={lastFormData?.marketingWallet || ""}
-                  flavor={lastFormData?.flavor ?? 0}
-                />
-              ) : (
+          <div className="space-y-4">
+            <Card className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-sm font-semibold text-white">Launch Progress</h3>
+                <span className="text-xs text-gray-400">Step {evmStep} / 4</span>
+              </div>
+              <ProgressStepper
+                currentStep={evmStep}
+                steps={["Pick network", "Configure token", "Deploy", "Post-launch"]}
+              />
+              <p className="text-xs text-gray-400">
+                New here? Connect wallet, choose a chain, fill the token form, and deploy. After launch, use Swap / Lock LP from the tabs above.
+              </p>
+            </Card>
+            <div className="grid gap-6 lg:grid-cols-3">
+              <div className="space-y-4">
+                <SectionTitle>1. Select Network</SectionTitle>
                 <Card>
-                  {!chainConfig?.factoryAddress && (
-                    <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
-                      ⚠️ No factory on <strong>{chainConfig?.name ?? `chain ${chainId}`}</strong> yet. Deploy one first.
-                    </div>
-                  )}
-                  {error && (
-                    <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                      {error.message}
-                    </div>
-                  )}
-                  <TokenForm
-                    onSubmit={handleDeploy}
-                    isSubmitting={isPending}
-                    launchFee={launchFee as bigint | undefined}
-                    nativeCurrencySymbol={chainConfig?.nativeCurrency.symbol ?? "ETH"}
-                  />
+                  <ChainSelector />
                 </Card>
-              )}
+              </div>
+              <div className="lg:col-span-2 space-y-4">
+                <SectionTitle>2. Configure &amp; Deploy</SectionTitle>
+                {!isConnected ? (
+                  <Card className="p-8 text-center space-y-4">
+                    <p className="text-2xl">👛</p>
+                    <p className="text-gray-300 text-sm font-medium">Connect your wallet to start launching.</p>
+                    <p className="text-gray-500 text-xs max-w-sm mx-auto">
+                      We will auto-detect your network. You can still switch chains manually from the network selector.
+                    </p>
+                    <ConnectButton />
+                  </Card>
+                ) : deployResult ? (
+                  <DeployResult
+                    result={deployResult}
+                    chainId={chainId}
+                    onReset={() => window.location.reload()}
+                    tokenName={lastFormData?.name}
+                    tokenSymbol={lastFormData?.symbol}
+                    ownerAddress={lastFormData?.marketingWallet || ""}
+                    flavor={lastFormData?.flavor ?? 0}
+                  />
+                ) : (
+                  <Card>
+                    {!chainConfig?.factoryAddress && (
+                      <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-sm text-yellow-400">
+                        ⚠️ No factory on <strong>{chainConfig?.name ?? `chain ${chainId}`}</strong> yet. Deploy one first.
+                      </div>
+                    )}
+                    {error && (
+                      <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                        {error.message}
+                      </div>
+                    )}
+                    <TokenForm
+                      onSubmit={handleDeploy}
+                      isSubmitting={isPending}
+                      launchFee={launchFee as bigint | undefined}
+                      nativeCurrencySymbol={chainConfig?.nativeCurrency.symbol ?? "ETH"}
+                    />
+                  </Card>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -394,6 +447,32 @@ function Step({ n, text }: { n: number; text: string }) {
         {n}
       </span>
       <span>{text}</span>
+    </div>
+  );
+}
+
+function ProgressStepper({ currentStep, steps }: { currentStep: number; steps: string[] }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-4">
+      {steps.map((step, i) => {
+        const index = i + 1;
+        const isDone = currentStep > index;
+        const isActive = currentStep === index;
+        return (
+          <div
+            key={step}
+            className={`rounded-lg border px-3 py-2 text-xs ${
+              isDone
+                ? "border-brand-500/40 bg-brand-500/10 text-brand-300"
+                : isActive
+                  ? "border-blue-400/50 bg-blue-500/10 text-blue-300"
+                  : "border-dark-border bg-dark-muted/60 text-gray-500"
+            }`}
+          >
+            <p className="font-semibold">{isDone ? "✓" : index}. {step}</p>
+          </div>
+        );
+      })}
     </div>
   );
 }

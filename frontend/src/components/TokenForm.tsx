@@ -55,6 +55,7 @@ export function TokenForm({
     flavor: initialFlavor ?? TokenFlavor.Standard,
   });
   const [showNarratives, setShowNarratives] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -116,13 +117,13 @@ export function TokenForm({
         <button
           type="button"
           onClick={() => setShowNarratives((v) => !v)}
-          className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-brand-700"
+          className="flex items-center gap-2 text-sm font-semibold text-gray-200 hover:text-brand-400"
         >
           <span>🌶 Hot Meta Narratives</span>
-          <span className="text-gray-400 text-xs">{showNarratives ? "▲ hide" : "▼ show"}</span>
+          <span className="text-gray-500 text-xs">{showNarratives ? "▲ hide" : "▼ show"}</span>
         </button>
         {showNarratives && (
-          <div className="mt-3">
+          <div className="mt-3 rounded-xl border border-dark-border bg-dark-muted/40 p-3">
             <NarrativePicker
               onSelect={(name) => {
                 const flavor = FLAVOR_BY_NAME[name];
@@ -138,11 +139,11 @@ export function TokenForm({
 
       {/* ─── Token Flavor ─────────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
+        <label className="block text-sm font-semibold text-gray-200 mb-2">
           Token Flavor
         </label>
         {/* Meta flavors */}
-        <p className="text-xs text-gray-400 mb-1.5">Trending narratives</p>
+        <p className="text-xs text-gray-500 mb-1.5">Trending narratives</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 mb-3">
           {FLAVOR_OPTIONS.filter((o) => META_FLAVORS.includes(o.value)).map(({ value, label }) => (
             <button
@@ -151,8 +152,8 @@ export function TokenForm({
               onClick={() => set("flavor", value)}
               className={`rounded-lg border p-2.5 text-left text-xs transition-colors ${
                 form.flavor === value
-                  ? "border-brand-500 bg-brand-50 text-brand-700 font-medium"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-brand-300"
+                  ? "border-brand-500 bg-brand-500/10 text-brand-300 font-medium"
+                  : "border-dark-border bg-dark-card text-gray-400 hover:border-brand-500/50"
               }`}
             >
               {label}
@@ -160,7 +161,7 @@ export function TokenForm({
           ))}
         </div>
         {/* Classic flavors */}
-        <p className="text-xs text-gray-400 mb-1.5">Classic templates</p>
+        <p className="text-xs text-gray-500 mb-1.5">Classic templates</p>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
           {FLAVOR_OPTIONS.filter((o) => CLASSIC_FLAVORS.includes(o.value)).map(({ value, label }) => (
             <button
@@ -169,8 +170,8 @@ export function TokenForm({
               onClick={() => set("flavor", value)}
               className={`rounded-lg border p-2.5 text-left text-xs transition-colors ${
                 form.flavor === value
-                  ? "border-brand-500 bg-brand-50 text-brand-700 font-medium"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-brand-300"
+                  ? "border-brand-500 bg-brand-500/10 text-brand-300 font-medium"
+                  : "border-dark-border bg-dark-card text-gray-400 hover:border-brand-500/50"
               }`}
             >
               {label}
@@ -210,38 +211,9 @@ export function TokenForm({
           />
         </Field>
       </div>
-
-      {/* ─── AI Description ────────────────────────────────────────────────── */}
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-sm font-medium text-gray-700">
-            Description <span className="text-gray-400 font-normal">(optional — auto-fills the IPFS Upload tab)</span>
-          </label>
-          <button
-            type="button"
-            onClick={handleAiGenerate}
-            disabled={aiLoading}
-            className="flex items-center gap-1 rounded-lg border border-brand-300 bg-brand-50 px-2.5 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-60 transition-colors"
-          >
-            {aiLoading ? (
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-            ) : (
-              "✨"
-            )}
-            AI Generate
-          </button>
-        </div>
-        <textarea
-          value={form.description}
-          onChange={(e) => set("description", e.target.value)}
-          rows={2}
-          placeholder="Token description — auto-fills the IPFS Upload tab when you switch to it"
-          className={`${inputCls} resize-none`}
-        />
-        {aiError && (
-          <p className="mt-1 text-xs text-red-500">{aiError}</p>
-        )}
-      </div>
+      <p className="text-xs text-gray-500 -mt-2">
+        Use a clear name and a short ticker (max 8 chars). Required fields are marked with *.
+      </p>
 
       {/* ─── Supply / Decimals ─────────────────────────────────────────────── */}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -257,17 +229,63 @@ export function TokenForm({
             />
           </Field>
         )}
+      </div>
 
-        <Field label="Decimals">
-          <input
-            type="number"
-            value={form.decimals}
-            onChange={(e) => set("decimals", Number(e.target.value))}
-            min={0}
-            max={18}
-            className={inputCls}
-          />
-        </Field>
+      {/* ─── Advanced settings ─────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-dark-border bg-dark-muted/30 p-4 space-y-4">
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="flex w-full items-center justify-between text-left"
+        >
+          <span className="text-sm font-semibold text-gray-200">Advanced Settings</span>
+          <span className="text-xs text-gray-500">{showAdvanced ? "▲ hide" : "▼ show"}</span>
+        </button>
+        {showAdvanced && (
+          <div className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Decimals">
+                <input
+                  type="number"
+                  value={form.decimals}
+                  onChange={(e) => set("decimals", Number(e.target.value))}
+                  min={0}
+                  max={18}
+                  className={inputCls}
+                />
+              </Field>
+            </div>
+
+            <div>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-200">
+                  Description <span className="font-normal text-gray-500">(optional — auto-fills IPFS tab)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAiGenerate}
+                  disabled={aiLoading}
+                  className="flex items-center gap-1 rounded-lg border border-brand-500/40 bg-brand-500/10 px-2.5 py-1 text-xs font-medium text-brand-300 hover:bg-brand-500/20 disabled:opacity-60 transition-colors"
+                >
+                  {aiLoading ? (
+                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
+                  ) : (
+                    "✨"
+                  )}
+                  AI Generate
+                </button>
+              </div>
+              <textarea
+                value={form.description}
+                onChange={(e) => set("description", e.target.value)}
+                rows={2}
+                placeholder="Describe your token utility / meme narrative"
+                className={`${inputCls} resize-none`}
+              />
+              {aiError && <p className="mt-1 text-xs text-red-400">{aiError}</p>}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── Taxable fields ────────────────────────────────────────────────── */}
@@ -308,7 +326,7 @@ export function TokenForm({
       {/* ─── Bonding Curve info ────────────────────────────────────────────── */}
       {isBondingCurve && (
         <FlavorCard color="blue" title="📈 Bonding Curve Token">
-          <p className="text-sm text-blue-600">
+          <p className="text-sm text-blue-200">
             Supply starts at 0. Tokens minted on buy, burned on sell. Price increases linearly — pump.fun style.
           </p>
         </FlavorCard>
@@ -325,7 +343,7 @@ export function TokenForm({
               <input type="number" value={form.agentBurnCapBps} onChange={(e) => set("agentBurnCapBps", Number(e.target.value))} min={0} max={500} className={inputCls} />
             </Field>
           </div>
-          <p className="mt-2 text-xs text-indigo-600">
+          <p className="mt-2 text-xs text-indigo-200">
             The agent wallet can call autoBurn(), autoRedistribute(), and postMeme() within the daily cap. Owner can change the cap anytime.
           </p>
         </FlavorCard>
@@ -342,7 +360,7 @@ export function TokenForm({
               <input type="number" value={form.loserBurnBps} onChange={(e) => set("loserBurnBps", Number(e.target.value))} min={0} max={5000} className={inputCls} />
             </Field>
           </div>
-          <p className="mt-2 text-xs text-amber-700">
+          <p className="mt-2 text-xs text-amber-200">
             After deploy, call setEventMeta() to set the event name + resolution timestamp. Then lockCutoff() and resolve(yesWon) when the event happens.
           </p>
         </FlavorCard>
@@ -362,7 +380,7 @@ export function TokenForm({
               <input type="number" value={form.teamCapBps} onChange={(e) => set("teamCapBps", Number(e.target.value))} min={100} max={2000} className={inputCls} />
             </Field>
           </div>
-          <p className="mt-2 text-xs text-green-700">
+          <p className="mt-2 text-xs text-green-200">
             After deploy, call fundRewardPool() to seed staking rewards. Holders call stake() / unstake() / claimRewards().
           </p>
         </FlavorCard>
@@ -382,16 +400,16 @@ export function TokenForm({
               <input type="text" value={form.marketingWallet} onChange={(e) => set("marketingWallet", e.target.value)} placeholder="0x..." className={inputCls} />
             </Field>
           </div>
-          <p className="mt-2 text-xs text-orange-700">
+          <p className="mt-2 text-xs text-orange-200">
             When ETH reserve hits the threshold, trading pauses 24 h. Call resumeTrading(pairAddress) after adding LP on Uniswap/PancakeSwap to reopen.
           </p>
         </FlavorCard>
       )}
 
       {/* ─── Launch fee ────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm">
-        <span className="text-gray-600">Launch fee</span>
-        <span className="font-semibold text-gray-800">{launchFeeDisplay}</span>
+      <div className="flex items-center justify-between rounded-lg border border-dark-border bg-dark-muted px-4 py-3 text-sm">
+        <span className="text-gray-400">Launch fee</span>
+        <span className="font-semibold text-brand-300">{launchFeeDisplay}</span>
       </div>
 
       {/* ─── Submit ────────────────────────────────────────────────────────── */}
@@ -409,18 +427,18 @@ export function TokenForm({
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 const inputCls =
-  "block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
+  "block w-full rounded-lg border border-dark-border bg-dark-card px-3 py-2 text-sm text-gray-100 placeholder:text-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
 
 type ColorKey = "yellow" | "red" | "purple" | "blue" | "indigo" | "amber" | "green" | "orange";
 const COLOR_MAP: Record<ColorKey, string> = {
-  yellow: "border-yellow-200 bg-yellow-50 text-yellow-800",
-  red:    "border-red-200 bg-red-50 text-red-800",
-  purple: "border-purple-200 bg-purple-50 text-purple-800",
-  blue:   "border-blue-200 bg-blue-50 text-blue-800",
-  indigo: "border-indigo-200 bg-indigo-50 text-indigo-800",
-  amber:  "border-amber-200 bg-amber-50 text-amber-800",
-  green:  "border-green-200 bg-green-50 text-green-800",
-  orange: "border-orange-200 bg-orange-50 text-orange-800",
+  yellow: "border-yellow-500/30 bg-yellow-500/10 text-yellow-100",
+  red:    "border-red-500/30 bg-red-500/10 text-red-100",
+  purple: "border-purple-500/30 bg-purple-500/10 text-purple-100",
+  blue:   "border-blue-500/30 bg-blue-500/10 text-blue-100",
+  indigo: "border-indigo-500/30 bg-indigo-500/10 text-indigo-100",
+  amber:  "border-amber-500/30 bg-amber-500/10 text-amber-100",
+  green:  "border-green-500/30 bg-green-500/10 text-green-100",
+  orange: "border-orange-500/30 bg-orange-500/10 text-orange-100",
 };
 
 function FlavorCard({ color, title, children }: { color: ColorKey; title: string; children: React.ReactNode }) {
@@ -447,10 +465,11 @@ function Field({
 }) {
   return (
     <div className={className}>
-      <label className="mb-1 block text-sm font-medium text-gray-700">
+      <label className="mb-1 block text-sm font-medium text-gray-200">
         {label}
-        {required && <span className="ml-1 text-red-500">*</span>}
-        {hint && <span className="ml-2 text-xs text-gray-400">({hint})</span>}
+        {required && <span className="ml-1 text-red-400">*</span>}
+        {!required && <span className="ml-1 text-gray-500 text-xs">(optional)</span>}
+        {hint && <span className="ml-2 text-xs text-gray-500">({hint})</span>}
       </label>
       {children}
     </div>

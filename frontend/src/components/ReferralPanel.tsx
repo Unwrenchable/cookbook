@@ -109,6 +109,11 @@ export function ReferralPanel() {
             {copied ? "✓ Copied" : "Copy"}
           </button>
         </div>
+        {copied && (
+          <p className="text-xs text-brand-400" aria-live="polite">
+            Link copied. Share it anywhere — rewards are tracked on-chain.
+          </p>
+        )}
       </div>
 
       {/* Earnings */}
