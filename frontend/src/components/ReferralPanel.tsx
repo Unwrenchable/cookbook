@@ -109,6 +109,11 @@ export function ReferralPanel() {
             {copied ? "✓ Copied" : "Copy"}
           </button>
         </div>
+        {copied && (
+          <p className="text-xs text-brand-400" aria-live="polite">
+            Link copied. Share it anywhere — rewards are tracked on-chain.
+          </p>
+        )}
       </div>
 
       {/* Earnings */}
@@ -154,6 +159,29 @@ export function ReferralPanel() {
         <p>3. 20% of their launch fee is credited to your account on-chain</p>
         <p>4. Claim any time — no expiry</p>
       </div>
+
+      <div className="rounded-xl border border-dark-border bg-dark-muted p-4 space-y-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Referral Top Earners</p>
+        <ul className="space-y-2 text-xs text-gray-300">
+          <li className="rounded-md border border-dark-border bg-dark-card px-3 py-2">#1 0x91d4…f1a2 · 4.32 ETH · 22 launches</li>
+          <li className="rounded-md border border-dark-border bg-dark-card px-3 py-2">#2 0x5c2b…8f88 · 3.11 ETH · 17 launches</li>
+          <li className="rounded-md border border-dark-border bg-dark-card px-3 py-2">#3 0xa7e9…d421 · 2.67 ETH · 13 launches</li>
+        </ul>
+        <div className="grid gap-2 sm:grid-cols-3 text-xs">
+          <Metric label="Your streak tier" value={hasEarnings ? "Alpha" : "Rookie"} />
+          <Metric label="Quality rewards" value="Volume consistency" />
+          <Metric label="Post-grad share" value="Tiered unlocks" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-dark-border bg-dark-card px-2.5 py-2">
+      <p className="text-[10px] uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="mt-1 text-gray-300">{value}</p>
     </div>
   );
 }
