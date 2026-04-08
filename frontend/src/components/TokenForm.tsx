@@ -468,7 +468,6 @@ function Field({
       <label className="mb-1 block text-sm font-medium text-gray-200">
         {label}
         {required && <span className="ml-1 text-red-400">*</span>}
-        {!required && <span className="ml-1 text-gray-500 text-xs">(optional)</span>}
         {hint && <span className="ml-2 text-xs text-gray-500">({hint})</span>}
       </label>
       {children}
