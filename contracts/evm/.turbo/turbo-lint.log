@@ -1,0 +1,6 @@
+
+
+> @tokenforge/contracts-evm@1.0.0 lint /home/runner/work/cookbook/cookbook/contracts/evm
+> solhint 'contracts/**/*.sol'
+
+[41m[30m ELIFECYCLE [39m[49m [31mCommand failed.[39m
