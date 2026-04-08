@@ -237,7 +237,7 @@ function HomePageContent() {
                     <p className="text-2xl">👛</p>
                     <p className="text-gray-300 text-sm font-medium">Connect your wallet to start launching.</p>
                     <p className="text-gray-500 text-xs max-w-sm mx-auto">
-                      We will auto-detect your network. You can still switch chains manually from the network selector.
+                      We will auto-detect your network. You can still switch chains manually from the Select Network section.
                     </p>
                     <ConnectButton />
                   </Card>
