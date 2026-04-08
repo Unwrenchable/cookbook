@@ -139,50 +139,76 @@ export function TokenForm({
 
       {/* ─── Token Flavor ─────────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-semibold text-gray-200 mb-2">
+        <label className="block text-sm font-semibold text-gray-200 mb-3">
           Token Flavor
         </label>
-        {/* Meta flavors */}
-        <p className="text-xs text-gray-500 mb-1.5">Trending narratives</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 mb-3">
-          {FLAVOR_OPTIONS.filter((o) => META_FLAVORS.includes(o.value)).map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => set("flavor", value)}
-              className={`rounded-lg border p-2.5 text-left text-xs transition-colors ${
-                form.flavor === value
-                  ? "border-brand-500 bg-brand-500/10 text-brand-300 font-medium"
-                  : "border-dark-border bg-dark-card text-gray-400 hover:border-brand-500/50"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+
+        {/* Meta / Trending flavors */}
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">🔥 Trending Narratives</span>
+          <div className="flex-1 h-px bg-dark-border" />
         </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 mb-4">
+          {FLAVOR_OPTIONS.filter((o) => META_FLAVORS.includes(o.value)).map(({ value, label }) => {
+            const isActive = form.flavor === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => set("flavor", value)}
+                className={`relative rounded-xl border p-3 text-left text-xs transition-all ${
+                  isActive
+                    ? "border-brand-500/60 bg-brand-500/15 text-brand-300 font-semibold glow-neon"
+                    : "border-dark-border bg-dark-card text-gray-400 hover:border-brand-500/30 hover:bg-dark-muted hover:text-gray-200"
+                }`}
+              >
+                {isActive && (
+                  <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse" />
+                )}
+                <p className="leading-snug">{label}</p>
+                {TOKEN_FLAVOR_DESCRIPTIONS[value] && (
+                  <p className={`mt-1 text-[10px] leading-tight ${isActive ? "text-brand-500" : "text-gray-600"}`}>
+                    {TOKEN_FLAVOR_DESCRIPTIONS[value].split(".")[0]}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Classic flavors */}
-        <p className="text-xs text-gray-500 mb-1.5">Classic templates</p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-          {FLAVOR_OPTIONS.filter((o) => CLASSIC_FLAVORS.includes(o.value)).map(({ value, label }) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => set("flavor", value)}
-              className={`rounded-lg border p-2.5 text-left text-xs transition-colors ${
-                form.flavor === value
-                  ? "border-brand-500 bg-brand-500/10 text-brand-300 font-medium"
-                  : "border-dark-border bg-dark-card text-gray-400 hover:border-brand-500/50"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-gray-600">⚡ Classic Templates</span>
+          <div className="flex-1 h-px bg-dark-border" />
         </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 mb-3">
+          {FLAVOR_OPTIONS.filter((o) => CLASSIC_FLAVORS.includes(o.value)).map(({ value, label }) => {
+            const isActive = form.flavor === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                onClick={() => set("flavor", value)}
+                className={`relative rounded-xl border p-2.5 text-left text-xs transition-all ${
+                  isActive
+                    ? "border-brand-500/60 bg-brand-500/15 text-brand-300 font-semibold glow-neon"
+                    : "border-dark-border bg-dark-card text-gray-400 hover:border-brand-500/30 hover:bg-dark-muted hover:text-gray-200"
+                }`}
+              >
+                {isActive && (
+                  <span className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse" />
+                )}
+                <p className="leading-snug truncate">{label}</p>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Selected description */}
         {TOKEN_FLAVOR_DESCRIPTIONS[form.flavor] && (
-          <p className="mt-2 text-xs text-gray-500 italic">
+          <div className="rounded-lg border border-brand-500/20 bg-brand-500/5 px-3 py-2 text-xs text-brand-400/80 italic">
             {TOKEN_FLAVOR_DESCRIPTIONS[form.flavor]}
-          </p>
+          </div>
         )}
         <div className="mt-3 flex flex-wrap gap-2 text-xs">
           <TrustBadge>✅ Multi-chain launch path</TrustBadge>
@@ -431,18 +457,25 @@ export function TokenForm({
       )}
 
       {/* ─── Launch fee ────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between rounded-lg border border-dark-border bg-dark-muted px-4 py-3 text-sm">
-        <span className="text-gray-400">Launch fee</span>
-        <span className="font-semibold text-brand-300">{launchFeeDisplay}</span>
+      <div className="flex items-center justify-between rounded-xl border border-brand-500/25 bg-brand-500/5 px-4 py-3 text-sm">
+        <span className="text-gray-400 font-medium">Launch fee</span>
+        <span className="font-black text-brand-300 text-base">{launchFeeDisplay}</span>
       </div>
 
       {/* ─── Submit ────────────────────────────────────────────────────────── */}
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white shadow hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-60 transition-colors"
+        className="w-full rounded-xl bg-brand-500 hover:bg-brand-400 active:bg-brand-600 px-6 py-3 font-black text-black shadow-lg hover:glow-neon focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 focus:ring-offset-dark-bg disabled:opacity-60 transition-all text-sm tracking-wide"
       >
-        {isSubmitting ? "Deploying…" : "🚀 Deploy Token"}
+        {isSubmitting ? (
+          <span className="flex items-center justify-center gap-2">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent" />
+            Deploying…
+          </span>
+        ) : (
+          "🚀 Deploy Token"
+        )}
       </button>
     </form>
   );
