@@ -42,7 +42,7 @@ export function SolanaProviders({ children, isTestnet = false, rpcEndpoint }: Pr
     if (typeof window === "undefined") {
       return process.env.SOLANA_RPC_URL ?? clusterApiUrl(network);
     }
-    return `/api/solana-rpc?network=${network}`;
+    return new URL(`/api/solana-rpc?network=${network}`, window.location.origin).toString();
   }, [isTestnet, rpcEndpoint]);
 
   // Register all supported wallet adapters.
