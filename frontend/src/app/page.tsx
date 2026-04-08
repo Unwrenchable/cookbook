@@ -22,6 +22,27 @@ import { useNetwork } from "@/lib/networkContext";
 import type { TokenFormData } from "@/lib/types";
 
 type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "vanity" | "dashboard" | "referral";
+type DiscoveryTab = "trending" | "new" | "graduate" | "cross-chain" | "referral";
+
+const DISCOVERY_TABS: { id: DiscoveryTab; label: string }[] = [
+  { id: "trending", label: "🔥 Trending" },
+  { id: "new", label: "✨ New" },
+  { id: "graduate", label: "🎯 About-to-Graduate" },
+  { id: "cross-chain", label: "🌉 Cross-chain Activated" },
+  { id: "referral", label: "🤝 Referral Top Earners" },
+];
+
+const NOW_LAUNCHING = [
+  { symbol: "$GOON", chain: "Base", velocity: "+38%", age: "2m", volume: "12.4 ETH" },
+  { symbol: "$FIZZ", chain: "Arbitrum", velocity: "+24%", age: "6m", volume: "7.1 ETH" },
+  { symbol: "$CAPS", chain: "BSC", velocity: "+19%", age: "9m", volume: "18.9 BNB" },
+];
+
+const GRADUATED = [
+  { symbol: "$WASTED", destination: "Uniswap", progress: "100%" },
+  { symbol: "$BUNKER", destination: "PancakeSwap", progress: "100%" },
+  { symbol: "$VOID", destination: "Aerodrome", progress: "100%" },
+];
 
 export default function HomePage() {
   return (
@@ -44,6 +65,7 @@ function HomePageContent() {
 
   const { isTestnet, setIsTestnet } = useNetwork();
   const [activeTab,  setActiveTab]  = useState<Tab>("evm");
+  const [discoveryTab, setDiscoveryTab] = useState<DiscoveryTab>("trending");
   const [lastFormData, setLastFormData] = useState<TokenFormData | null>(null);
 
   async function handleDeploy(formData: TokenFormData) {
@@ -165,6 +187,42 @@ function HomePageContent() {
             . A share of your launch fee goes to them — no extra cost to you.
           </div>
         )}
+
+        <Card className="space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-white">Discovery Hub</h3>
+            <span className="text-[11px] text-gray-500">Sorted by momentum velocity</span>
+          </div>
+          <div className="overflow-x-auto">
+            <div className="inline-flex gap-1 rounded-lg border border-dark-border bg-dark-muted p-1">
+              {DISCOVERY_TABS.map(({ id, label }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setDiscoveryTab(id)}
+                  className={`rounded-md px-3 py-1.5 text-xs whitespace-nowrap transition-colors ${
+                    discoveryTab === id
+                      ? "bg-brand-600 text-white"
+                      : "text-gray-400 hover:bg-dark-card hover:text-white"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <DiscoveryFeed tab={discoveryTab} />
+          <div className="grid gap-4 md:grid-cols-2">
+            <FeedList
+              title="⚡ Now Launching"
+              rows={NOW_LAUNCHING.map((token) => `${token.symbol} · ${token.chain} · ${token.velocity} · ${token.age} · ${token.volume}`)}
+            />
+            <FeedList
+              title="🏁 Graduated"
+              rows={GRADUATED.map((token) => `${token.symbol} → ${token.destination} (${token.progress})`)}
+            />
+          </div>
+        </Card>
 
         {/* Navigation */}
         <div className="space-y-3">
@@ -473,6 +531,63 @@ function ProgressStepper({ currentStep, steps }: { currentStep: number; steps: s
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function DiscoveryFeed({ tab }: { tab: DiscoveryTab }) {
+  const rows: Record<DiscoveryTab, string[]> = {
+    trending: [
+      "$GOON (Base) · +38% velocity · 312 traders",
+      "$FIZZ (Arbitrum) · +24% velocity · 218 traders",
+      "$CAPS (BSC) · +19% velocity · 401 traders",
+    ],
+    new: [
+      "$FROTH · launched 2m ago",
+      "$BUNKERAI · launched 4m ago",
+      "$TRENCHSPIN · launched 7m ago",
+    ],
+    graduate: [
+      "$REKTBOX · 89% to graduation",
+      "$NEONBURN · 83% to graduation",
+      "$SLEEPLESS · 79% to graduation",
+    ],
+    "cross-chain": [
+      "$SPARK minted on 4 chains from Solana burn",
+      "$ATOMIC minted on 3 chains from Solana burn",
+      "$VAULT minted on 2 chains from Solana burn",
+    ],
+    referral: [
+      "0x91d4…f1a2 · 22 launches · 4.32 ETH earned",
+      "0x5c2b…8f88 · 17 launches · 3.11 ETH earned",
+      "0xa7e9…d421 · 13 launches · 2.67 ETH earned",
+    ],
+  };
+
+  return (
+    <div className="rounded-xl border border-dark-border bg-dark-muted/40 p-4">
+      <ul className="space-y-2 text-sm text-gray-300">
+        {rows[tab].map((row) => (
+          <li key={row} className="rounded-md border border-dark-border bg-dark-card px-3 py-2">
+            {row}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function FeedList({ title, rows }: { title: string; rows: string[] }) {
+  return (
+    <div className="rounded-xl border border-dark-border bg-dark-muted/40 p-4">
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{title}</p>
+      <ul className="space-y-2 text-xs text-gray-300">
+        {rows.map((row) => (
+          <li key={row} className="rounded-md border border-dark-border bg-dark-card px-3 py-2">
+            {row}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

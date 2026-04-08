@@ -104,6 +104,7 @@ export function TokenForm({
   const isUtilityHybrid = form.flavor === TokenFlavor.UtilityHybrid;
   const isPumpMigrate   = form.flavor === TokenFlavor.PumpMigrate;
   const hasBondingCurve = isBondingCurve || isPumpMigrate;
+  const totalTaxBps = form.buyTaxBps + form.sellTaxBps;
 
   const launchFeeDisplay = launchFee !== undefined
     ? `${(Number(launchFee) / 1e18).toFixed(4)} ${nativeCurrencySymbol}`
@@ -184,6 +185,12 @@ export function TokenForm({
             {TOKEN_FLAVOR_DESCRIPTIONS[form.flavor]}
           </p>
         )}
+        <div className="mt-3 flex flex-wrap gap-2 text-xs">
+          <TrustBadge>✅ Multi-chain launch path</TrustBadge>
+          <TrustBadge>🔒 LP lock tooling built-in</TrustBadge>
+          <TrustBadge>⚖️ Fee guardrails enforced</TrustBadge>
+          <TrustBadge>🧪 Testnet/Mainnet toggle</TrustBadge>
+        </div>
       </div>
 
       {/* ─── Basic fields ──────────────────────────────────────────────────── */}
@@ -302,6 +309,9 @@ export function TokenForm({
               <input type="text" value={form.marketingWallet} onChange={(e) => set("marketingWallet", e.target.value)} placeholder="0x..." className={inputCls} />
             </Field>
           </div>
+          {totalTaxBps > 1500 && (
+            <RiskWarningCard text="High combined buy/sell tax detected. Values above 15% can reduce trust and trading velocity." />
+          )}
         </FlavorCard>
       )}
 
@@ -311,6 +321,9 @@ export function TokenForm({
           <Field label="Burn Rate (bps, 100 = 1%)" hint="Max 500">
             <input type="number" value={form.burnBps} onChange={(e) => set("burnBps", Number(e.target.value))} min={0} max={500} className={inputCls} />
           </Field>
+          {form.burnBps > 200 && (
+            <RiskWarningCard text="Burn rate above 2% can make transfers feel punitive for holders." />
+          )}
         </FlavorCard>
       )}
 
@@ -383,6 +396,9 @@ export function TokenForm({
           <p className="mt-2 text-xs text-green-200">
             After deploy, call fundRewardPool() to seed staking rewards. Holders call stake() / unstake() / claimRewards().
           </p>
+          {form.teamCapBps > 1500 && (
+            <RiskWarningCard text="Team wallet cap above 15% can signal concentration risk. Keep caps conservative for stronger trust." />
+          )}
         </FlavorCard>
       )}
 
@@ -403,7 +419,16 @@ export function TokenForm({
           <p className="mt-2 text-xs text-orange-200">
             When ETH reserve hits the threshold, trading pauses 24 h. Call resumeTrading(pairAddress) after adding LP on Uniswap/PancakeSwap to reopen.
           </p>
+          {!form.marketingWallet && (
+            <RiskWarningCard text="Fee wallet is empty. Set a valid owner/fee wallet before launch to avoid fee-routing mistakes." />
+          )}
         </FlavorCard>
+      )}
+
+      {(isTaxable || isPumpMigrate) && !form.marketingWallet && (
+        <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-3 text-xs text-yellow-300">
+          ⚠️ Owner/marketing wallet is currently empty. Double-check before deploying.
+        </div>
       )}
 
       {/* ─── Launch fee ────────────────────────────────────────────────────── */}
@@ -471,6 +496,18 @@ function Field({
         {hint && <span className="ml-2 text-xs text-gray-500">({hint})</span>}
       </label>
       {children}
+    </div>
+  );
+}
+
+function TrustBadge({ children }: { children: React.ReactNode }) {
+  return <span className="rounded-full border border-dark-border bg-dark-muted px-2.5 py-1 text-gray-300">{children}</span>;
+}
+
+function RiskWarningCard({ text }: { text: string }) {
+  return (
+    <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs text-orange-200">
+      ⚠️ {text}
     </div>
   );
 }
