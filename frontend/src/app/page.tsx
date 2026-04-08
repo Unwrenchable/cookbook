@@ -88,12 +88,27 @@ const TICKER_ITEMS = [
   "🚀 $MOON +55% · Base", "📊 $VAULT 3 chains activated",
 ];
 
-// TODO: Replace with live API data when analytics endpoint is available
+// TODO: Replace with live API data when analytics endpoint is available.
+// Expected response: { tokensLaunched: number; totalVolumeUsd: number; activeTraders: number }
 const MOCK_STATS = [
   { label: "Tokens Launched", value: "12,847", icon: "🚀" },
   { label: "Total Volume",    value: "$4.2M",   icon: "💰" },
   { label: "Active Traders",  value: "8,291",   icon: "👥" },
 ] as const;
+
+/** Returns true for valid 20-byte Ethereum addresses (0x-prefixed, 42 chars). */
+function isValidEthAddress(addr: string): boolean {
+  return addr.startsWith("0x") && addr.length === 42;
+}
+
+const LEET_HEX_EXAMPLES: [string, string][] = [
+  ["fizz", "f122"],
+  ["caps", "ca95"],
+  ["dead", "dead"],
+  ["cafe", "cafe"],
+  ["face", "face"],
+  ["beef", "beef"],
+];
 
 export default function HomePage() {
   return (
@@ -211,7 +226,7 @@ function HomePageContent() {
       </section>
 
       {/* ── Referral banner ─────────────────────────────────────────────── */}
-      {referrer && referrer.startsWith("0x") && referrer.length === 42 && (
+      {referrer && isValidEthAddress(referrer) && (
         <div className="border-b border-brand-500/30 bg-brand-500/10 px-4 py-2.5 text-center text-sm text-brand-300">
           🤝 Referral link from{" "}
           <code className="font-mono text-brand-400">
@@ -523,7 +538,7 @@ function HomePageContent() {
                   <GlassCard className="mt-2 text-xs text-gray-500">
                     <p className="font-semibold text-gray-400 mb-2">Leet-hex cheatsheet</p>
                     <div className="grid grid-cols-2 gap-0.5 font-mono">
-                      {[["fizz","f122"],["caps","ca95"],["dead","dead"],["cafe","cafe"],["face","face"],["beef","beef"]].map(([w,h])=>(
+                      {LEET_HEX_EXAMPLES.map(([w, h]) => (
                         <span key={w} className="text-brand-400">
                           {w} → <span className="text-gray-400">{h}</span>
                         </span>

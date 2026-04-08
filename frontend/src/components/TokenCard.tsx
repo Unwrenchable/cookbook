@@ -38,7 +38,7 @@ function getAvatarColor(symbol: string): string {
     "from-yellow-500/40 to-yellow-700/20 text-yellow-300",
   ];
   const idx = symbol.charCodeAt(0) % colors.length;
-  return colors[idx];
+  return colors[idx] || colors[0];
 }
 
 export function TokenCard({

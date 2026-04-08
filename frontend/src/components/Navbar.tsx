@@ -27,7 +27,7 @@ export function Navbar() {
 
         {/* ── Logo ───────────────────────────────────────────────────── */}
         <Link href="/" className="flex items-center gap-2.5 group shrink-0">
-          <span className="text-xl animate-float select-none">⚒️</span>
+          <span className="text-xl animate-float select-none" aria-hidden="true">⚒️</span>
           <div className="leading-none">
             <span className="block text-[15px] font-black tracking-tighter text-brand-400 group-hover:text-brand-300 transition-colors drop-shadow-[0_0_8px_rgba(163,230,53,0.5)]">
               GOONFORGE.XYZ
