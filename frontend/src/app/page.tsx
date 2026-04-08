@@ -220,7 +220,7 @@ function HomePageContent() {
                 steps={["Pick network", "Configure token", "Deploy", "Post-launch"]}
               />
               <p className="text-xs text-gray-400">
-                New here? Connect wallet, choose a chain, fill the token form, and deploy. After launch, use Swap or the Tools tabs above.
+                New here? Connect wallet, choose a chain, fill the token form, and deploy. After launch, use Swap or the Tools section.
               </p>
             </Card>
             <div className="grid gap-6 lg:grid-cols-3">
