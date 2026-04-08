@@ -212,7 +212,7 @@ export function TokenForm({
         </Field>
       </div>
       <p className="text-xs text-gray-500 -mt-2">
-        Use a clear name and a short ticker (max 8 chars). Required fields are marked with *.
+        Use a clear name and a short symbol (max 8 chars). Required fields are marked with *.
       </p>
 
       {/* ─── Supply / Decimals ─────────────────────────────────────────────── */}
