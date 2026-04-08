@@ -9,6 +9,9 @@ import { getChainById } from "@/lib/chains";
 import { ListingHelper } from "@/components/ListingHelper";
 import { AuditReport } from "@/components/AuditReport";
 
+const COPY_FEEDBACK_TIMEOUT_MS = 1800;
+const RAID_HASHTAGS = "#GOONFORGE #degen";
+
 interface Props {
   result: DeployResultType;
   chainId: number;
@@ -26,10 +29,13 @@ export function DeployResult({ result, chainId, onReset, tokenName = "", tokenSy
 
   const swapUrl = buildSwapUrl(chainId, result.tokenAddress);
   const raidText = encodeURIComponent(
-    `🚀 ${tokenName || "New token"} ${tokenSymbol ? `($${tokenSymbol})` : ""} is live on ${chain?.name ?? "chain"}.\n` +
-    `Contract: ${result.tokenAddress}\n` +
-    `TX: ${explorerBase ? `${explorerBase}/tx/${result.txHash}` : result.txHash}\n` +
-    "#GOONFORGE #degen"
+    buildRaidText({
+      tokenName,
+      tokenSymbol,
+      chainName: chain?.name ?? "chain",
+      tokenAddress: result.tokenAddress,
+      txUrlOrHash: explorerBase ? `${explorerBase}/tx/${result.txHash}` : result.txHash,
+    })
   );
   const raidXUrl = `https://x.com/intent/post?text=${raidText}`;
 
@@ -37,7 +43,7 @@ export function DeployResult({ result, chainId, onReset, tokenName = "", tokenSy
     if (typeof navigator === "undefined") return;
     await navigator.clipboard.writeText(text);
     setCopied(key);
-    setTimeout(() => setCopied(null), 1800);
+    setTimeout(() => setCopied(null), COPY_FEEDBACK_TIMEOUT_MS);
   }
 
   return (
@@ -208,4 +214,23 @@ function buildSwapUrl(chainId: number, tokenAddress: string) {
     return `https://pancakeswap.finance/swap?outputCurrency=${tokenAddress}`;
   }
   return `https://app.uniswap.org/swap?outputCurrency=${tokenAddress}`;
+}
+
+function buildRaidText({
+  tokenName,
+  tokenSymbol,
+  chainName,
+  tokenAddress,
+  txUrlOrHash,
+}: {
+  tokenName: string;
+  tokenSymbol: string;
+  chainName: string;
+  tokenAddress: string;
+  txUrlOrHash: string;
+}) {
+  return `🚀 ${tokenName || "New token"} ${tokenSymbol ? `($${tokenSymbol})` : ""} is live on ${chainName}.
+Contract: ${tokenAddress}
+TX: ${txUrlOrHash}
+${RAID_HASHTAGS}`;
 }

@@ -7,6 +7,21 @@ import { useAccount, useChainId, useReadContract } from "wagmi";
 import { getChainById } from "@/lib/chains";
 import { TOKEN_FACTORY_ABI } from "@/lib/tokenFactoryAbi";
 
+const METRICS_CONFIG = {
+  // Creator reputation pacing
+  streakMultiplier: 3,
+  maxStreakDays: 30,
+  // Quality score calibration
+  baseQualityScore: 55,
+  qualityIncrement: 6,
+  maxQualityScore: 99,
+  // Mock trade pulse card values
+  baseBuys: 18,
+  buyIncrement: 7,
+  baseSells: 9,
+  sellIncrement: 3,
+} as const;
+
 export function TokenDashboard() {
   const { address, isConnected } = useAccount();
   const chainId     = useChainId();
@@ -56,8 +71,11 @@ export function TokenDashboard() {
     );
   }
 
-  const creatorStreak = Math.min(tokens.length * 3, 30);
-  const qualityScore = Math.min(55 + tokens.length * 6, 99);
+  const creatorStreak = Math.min(tokens.length * METRICS_CONFIG.streakMultiplier, METRICS_CONFIG.maxStreakDays);
+  const qualityScore = Math.min(
+    METRICS_CONFIG.baseQualityScore + tokens.length * METRICS_CONFIG.qualityIncrement,
+    METRICS_CONFIG.maxQualityScore
+  );
 
   return (
     <div className="space-y-4">
@@ -86,7 +104,10 @@ export function TokenDashboard() {
               )}
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3 text-xs">
-              <MiniBadge label="Live activity" value={`${18 + index * 7} buys / ${9 + index * 3} sells`} />
+              <MiniBadge
+                label="Live activity"
+                value={`${METRICS_CONFIG.baseBuys + index * METRICS_CONFIG.buyIncrement} buys / ${METRICS_CONFIG.baseSells + index * METRICS_CONFIG.sellIncrement} sells`}
+              />
               <MiniBadge label="Milestone" value={index === 0 ? "First 100 holders" : "LP locked"} />
               <MiniBadge label="Raid moment" value={index % 2 === 0 ? "New local ATH" : "Cross-chain activated"} />
             </div>

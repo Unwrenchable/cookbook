@@ -32,18 +32,6 @@ const DISCOVERY_TABS: { id: DiscoveryTab; label: string }[] = [
   { id: "referral", label: "🤝 Referral Top Earners" },
 ];
 
-const NOW_LAUNCHING = [
-  { symbol: "$GOON", chain: "Base", velocity: "+38%", age: "2m", volume: "12.4 ETH" },
-  { symbol: "$FIZZ", chain: "Arbitrum", velocity: "+24%", age: "6m", volume: "7.1 ETH" },
-  { symbol: "$CAPS", chain: "BSC", velocity: "+19%", age: "9m", volume: "18.9 BNB" },
-];
-
-const GRADUATED = [
-  { symbol: "$WASTED", destination: "Uniswap", progress: "100%" },
-  { symbol: "$BUNKER", destination: "PancakeSwap", progress: "100%" },
-  { symbol: "$VOID", destination: "Aerodrome", progress: "100%" },
-];
-
 export default function HomePage() {
   return (
     <Suspense fallback={null}>
@@ -89,14 +77,50 @@ function HomePageContent() {
     { id: "vanity",    label: "🔮 Vanity" },
     { id: "referral",  label: "🤝 Referral" },
   ];
+  // Temporary discovery mocks until API-driven feed is wired.
+  const nowLaunching = [
+    { symbol: "$GOON", chain: "Base", velocity: "+38%", age: "2m", volume: "12.4 ETH" },
+    { symbol: "$FIZZ", chain: "Arbitrum", velocity: "+24%", age: "6m", volume: "7.1 ETH" },
+    { symbol: "$CAPS", chain: "BSC", velocity: "+19%", age: "9m", volume: "18.9 BNB" },
+  ];
+  const graduated = [
+    { symbol: "$WASTED", destination: "Uniswap", progress: "100%" },
+    { symbol: "$BUNKER", destination: "PancakeSwap", progress: "100%" },
+    { symbol: "$VOID", destination: "Aerodrome", progress: "100%" },
+  ];
+  const discoveryRows: Record<DiscoveryTab, string[]> = {
+    trending: [
+      "$GOON (Base) · +38% velocity · 312 traders",
+      "$FIZZ (Arbitrum) · +24% velocity · 218 traders",
+      "$CAPS (BSC) · +19% velocity · 401 traders",
+    ],
+    new: [
+      "$FROTH · launched 2m ago",
+      "$BUNKERAI · launched 4m ago",
+      "$TRENCHSPIN · launched 7m ago",
+    ],
+    graduate: [
+      "$REKTBOX · 89% to graduation",
+      "$NEONBURN · 83% to graduation",
+      "$SLEEPLESS · 79% to graduation",
+    ],
+    "cross-chain": [
+      "$SPARK minted on 4 chains from Solana burn",
+      "$ATOMIC minted on 3 chains from Solana burn",
+      "$VAULT minted on 2 chains from Solana burn",
+    ],
+    referral: [
+      "0x91d4…f1a2 · 22 launches · 4.32 ETH earned",
+      "0x5c2b…8f88 · 17 launches · 3.11 ETH earned",
+      "0xa7e9…d421 · 13 launches · 2.67 ETH earned",
+    ],
+  };
 
-  const evmStep = deployResult
-    ? 4
-    : isPending
-      ? 3
-      : isConnected
-        ? 2
-        : 1;
+  const evmStep = getEvmStep({
+    hasDeployResult: Boolean(deployResult),
+    isPending,
+    isConnected,
+  });
 
   return (
     <div className="min-h-screen bg-dark-bg text-white">
@@ -211,15 +235,15 @@ function HomePageContent() {
               ))}
             </div>
           </div>
-          <DiscoveryFeed tab={discoveryTab} />
+          <DiscoveryFeed tab={discoveryTab} rows={discoveryRows} />
           <div className="grid gap-4 md:grid-cols-2">
             <FeedList
               title="⚡ Now Launching"
-              rows={NOW_LAUNCHING.map((token) => `${token.symbol} · ${token.chain} · ${token.velocity} · ${token.age} · ${token.volume}`)}
+              rows={nowLaunching.map((token) => `${token.symbol} · ${token.chain} · ${token.velocity} · ${token.age} · ${token.volume}`)}
             />
             <FeedList
               title="🏁 Graduated"
-              rows={GRADUATED.map((token) => `${token.symbol} → ${token.destination} (${token.progress})`)}
+              rows={graduated.map((token) => `${token.symbol} → ${token.destination} (${token.progress})`)}
             />
           </div>
         </Card>
@@ -535,35 +559,7 @@ function ProgressStepper({ currentStep, steps }: { currentStep: number; steps: s
   );
 }
 
-function DiscoveryFeed({ tab }: { tab: DiscoveryTab }) {
-  const rows: Record<DiscoveryTab, string[]> = {
-    trending: [
-      "$GOON (Base) · +38% velocity · 312 traders",
-      "$FIZZ (Arbitrum) · +24% velocity · 218 traders",
-      "$CAPS (BSC) · +19% velocity · 401 traders",
-    ],
-    new: [
-      "$FROTH · launched 2m ago",
-      "$BUNKERAI · launched 4m ago",
-      "$TRENCHSPIN · launched 7m ago",
-    ],
-    graduate: [
-      "$REKTBOX · 89% to graduation",
-      "$NEONBURN · 83% to graduation",
-      "$SLEEPLESS · 79% to graduation",
-    ],
-    "cross-chain": [
-      "$SPARK minted on 4 chains from Solana burn",
-      "$ATOMIC minted on 3 chains from Solana burn",
-      "$VAULT minted on 2 chains from Solana burn",
-    ],
-    referral: [
-      "0x91d4…f1a2 · 22 launches · 4.32 ETH earned",
-      "0x5c2b…8f88 · 17 launches · 3.11 ETH earned",
-      "0xa7e9…d421 · 13 launches · 2.67 ETH earned",
-    ],
-  };
-
+function DiscoveryFeed({ tab, rows }: { tab: DiscoveryTab; rows: Record<DiscoveryTab, string[]> }) {
   return (
     <div className="rounded-xl border border-dark-border bg-dark-muted/40 p-4">
       <ul className="space-y-2 text-sm text-gray-300">
@@ -590,4 +586,19 @@ function FeedList({ title, rows }: { title: string; rows: string[] }) {
       </ul>
     </div>
   );
+}
+
+function getEvmStep({
+  hasDeployResult,
+  isPending,
+  isConnected,
+}: {
+  hasDeployResult: boolean;
+  isPending: boolean;
+  isConnected: boolean;
+}) {
+  if (hasDeployResult) return 4;
+  if (isPending) return 3;
+  if (isConnected) return 2;
+  return 1;
 }

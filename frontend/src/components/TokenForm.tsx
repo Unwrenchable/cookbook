@@ -104,7 +104,6 @@ export function TokenForm({
   const isUtilityHybrid = form.flavor === TokenFlavor.UtilityHybrid;
   const isPumpMigrate   = form.flavor === TokenFlavor.PumpMigrate;
   const hasBondingCurve = isBondingCurve || isPumpMigrate;
-  const totalTaxBps = form.buyTaxBps + form.sellTaxBps;
 
   const launchFeeDisplay = launchFee !== undefined
     ? `${(Number(launchFee) / 1e18).toFixed(4)} ${nativeCurrencySymbol}`
@@ -309,7 +308,7 @@ export function TokenForm({
               <input type="text" value={form.marketingWallet} onChange={(e) => set("marketingWallet", e.target.value)} placeholder="0x..." className={inputCls} />
             </Field>
           </div>
-          {totalTaxBps > 1500 && (
+          {form.buyTaxBps + form.sellTaxBps > 1500 && (
             <RiskWarningCard text="High combined buy/sell tax detected. Values above 15% can reduce trust and trading velocity." />
           )}
         </FlavorCard>
