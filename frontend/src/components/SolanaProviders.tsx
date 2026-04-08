@@ -15,6 +15,7 @@
 import { useMemo } from "react";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { clusterApiUrl } from "@solana/web3.js";
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
@@ -33,12 +34,16 @@ interface Props {
 }
 
 export function SolanaProviders({ children, isTestnet = false, rpcEndpoint }: Props) {
-  const endpoint = useMemo(
-    () =>
-      rpcEndpoint ??
-      `/api/solana-rpc?network=${isTestnet ? "devnet" : "mainnet-beta"}`,
-    [isTestnet, rpcEndpoint]
-  );
+  const endpoint = useMemo(() => {
+    if (rpcEndpoint) {
+      return rpcEndpoint;
+    }
+    const network = isTestnet ? "devnet" : "mainnet-beta";
+    if (typeof window === "undefined") {
+      return process.env.SOLANA_RPC_URL ?? clusterApiUrl(network);
+    }
+    return `/api/solana-rpc?network=${network}`;
+  }, [isTestnet, rpcEndpoint]);
 
   // Register all supported wallet adapters.
   // Any wallet implementing the Wallet Standard is auto-detected in addition.
