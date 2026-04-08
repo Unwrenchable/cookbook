@@ -168,7 +168,7 @@ export function TokenForm({
                 <p className="leading-snug">{label}</p>
                 {TOKEN_FLAVOR_DESCRIPTIONS[value] && (
                   <p className={`mt-1 text-[10px] leading-tight ${isActive ? "text-brand-500" : "text-gray-600"}`}>
-                    {TOKEN_FLAVOR_DESCRIPTIONS[value].split(".")[0]}
+                    {TOKEN_FLAVOR_DESCRIPTIONS[value].split(".")[0] ?? TOKEN_FLAVOR_DESCRIPTIONS[value]}
                   </p>
                 )}
               </button>

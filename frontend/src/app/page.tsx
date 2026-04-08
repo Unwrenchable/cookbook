@@ -88,6 +88,13 @@ const TICKER_ITEMS = [
   "🚀 $MOON +55% · Base", "📊 $VAULT 3 chains activated",
 ];
 
+// TODO: Replace with live API data when analytics endpoint is available
+const MOCK_STATS = [
+  { label: "Tokens Launched", value: "12,847", icon: "🚀" },
+  { label: "Total Volume",    value: "$4.2M",   icon: "💰" },
+  { label: "Active Traders",  value: "8,291",   icon: "👥" },
+] as const;
+
 export default function HomePage() {
   return (
     <Suspense fallback={<PageSkeleton />}>
@@ -191,13 +198,9 @@ function HomePageContent() {
             </button>
           </div>
 
-          {/* Stats bar */}
+          {/* Stats bar — TODO: replace with live analytics API data */}
           <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto">
-            {[
-              { label: "Tokens Launched", value: "12,847", icon: "🚀" },
-              { label: "Total Volume",    value: "$4.2M",   icon: "💰" },
-              { label: "Active Traders",  value: "8,291",   icon: "👥" },
-            ].map(({ label, value, icon }) => (
+            {MOCK_STATS.map(({ label, value, icon }) => (
               <div key={label} className="rounded-xl border border-dark-border bg-dark-card/80 px-3 py-3">
                 <p className="text-xs text-gray-500 mb-1">{icon} {label}</p>
                 <p className="text-lg font-black text-brand-400 stat-value">{value}</p>
@@ -713,14 +716,7 @@ function HomePageContent() {
             >
               GitHub
             </a>
-            <span>·</span>
-            <a href="https://x.com" target="_blank" rel="noopener noreferrer" className="hover:text-brand-400 transition-colors">
-              Twitter/X
-            </a>
-            <span>·</span>
-            <a href="https://discord.com" target="_blank" rel="noopener noreferrer" className="hover:text-brand-400 transition-colors">
-              Discord
-            </a>
+            {/* TODO: Add official Twitter/X and Discord links when GoonForge social accounts are created */}
           </div>
         </div>
       </footer>

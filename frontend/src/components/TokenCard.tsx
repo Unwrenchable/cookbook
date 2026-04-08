@@ -133,12 +133,14 @@ export function TokenCard({
         <div className="flex gap-1.5">
           <button
             type="button"
+            onClick={() => { /* TODO: navigate to token explorer */ }}
             className="rounded-md border border-dark-border bg-dark-muted px-2 py-1 text-[10px] font-semibold text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
           >
             View
           </button>
           <button
             type="button"
+            onClick={() => { /* TODO: open swap widget for token */ }}
             className="rounded-md border border-brand-500/40 bg-brand-500/10 px-2 py-1 text-[10px] font-semibold text-brand-400 hover:bg-brand-500/20 hover:border-brand-500/60 transition-colors"
           >
             Trade
