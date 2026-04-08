@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId } from "wagmi";
@@ -24,6 +24,14 @@ import type { TokenFormData } from "@/lib/types";
 type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "vanity" | "dashboard" | "referral";
 
 export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomePageContent />
+    </Suspense>
+  );
+}
+
+function HomePageContent() {
   const { isConnected } = useAccount();
   const chainId      = useChainId();
   const chainConfig  = getChainById(chainId);
@@ -389,4 +397,3 @@ function Step({ n, text }: { n: number; text: string }) {
     </div>
   );
 }
-
