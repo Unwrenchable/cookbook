@@ -4,7 +4,14 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**", "artifacts/**"]
+      "outputs": [".next/**", "!.next/cache/**", "dist/**", "artifacts/**"],
+      "env": [
+        "ALCHEMY_KEY",
+        "OPENAI_API_KEY",
+        "PINATA_JWT",
+        "NEXT_PUBLIC_WC_PROJECT_ID",
+        "NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID"
+      ]
     },
     "dev": {
       "cache": false,
