@@ -1,6 +1,6 @@
 /**
  * Navbar.tsx – Sticky top navigation bar for GOONFORGE.XYZ
- * Logo · Nav links · Testnet/Mainnet toggle · RainbowKit ConnectButton
+ * Logo · Nav links · Testnet/Mainnet toggle · RainbowKit ConnectButton · Solana WalletMultiButton
  */
 "use client";
 
@@ -8,6 +8,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useNetwork } from "@/lib/networkContext";
+import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
+import { useWallet } from "@solana/wallet-adapter-react";
 
 const NAV_TABS = [
   { href: "/?tab=evm",           label: "Launch",    emoji: "🚀" },
@@ -16,6 +18,29 @@ const NAV_TABS = [
   { href: "/?tab=dashboard",     label: "Portfolio", emoji: "📋" },
   { href: "/?tab=vanity",        label: "Tools",     emoji: "🔮" },
 ] as const;
+
+/** Compact purple/green Solana wallet button shared by header and mobile menu */
+function SolanaWalletBtn({ fullWidth = false }: { fullWidth?: boolean }) {
+  const { connected } = useWallet();
+  return (
+    <WalletMultiButton
+      style={{
+        background:   connected ? "rgba(163,230,53,0.1)"  : "rgba(124,58,237,0.15)",
+        border:       `1px solid ${connected ? "rgba(163,230,53,0.3)" : "rgba(124,58,237,0.4)"}`,
+        borderRadius: "0.75rem",
+        color:        connected ? "#a3e635" : "#a78bfa",
+        fontSize:     "0.75rem",
+        fontWeight:   600,
+        padding:      "0.4rem 0.85rem",
+        height:       "auto",
+        lineHeight:   "1.25rem",
+        width:        fullWidth ? "100%" : undefined,
+        minWidth:     0,
+        whiteSpace:   "nowrap",
+      }}
+    />
+  );
+}
 
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -75,6 +100,11 @@ export function Navbar() {
             {isTestnet ? "Testnet" : "Mainnet"}
           </button>
 
+          {/* Solana wallet (desktop md+) */}
+          <div className="hidden md:flex">
+            <SolanaWalletBtn />
+          </div>
+
           {/* RainbowKit connect */}
           <ConnectButton accountStatus="avatar" showBalance={false} chainStatus="icon" />
 
@@ -104,7 +134,7 @@ export function Navbar() {
               {label}
             </Link>
           ))}
-          <div className="pt-2 border-t border-dark-border mt-2">
+          <div className="pt-2 border-t border-dark-border mt-2 space-y-2">
             <button
               type="button"
               onClick={() => setIsTestnet(!isTestnet)}
@@ -117,6 +147,11 @@ export function Navbar() {
               <span className={`h-1.5 w-1.5 rounded-full ${isTestnet ? "bg-yellow-400 animate-pulse" : "bg-brand-400"}`} />
               {isTestnet ? "🧪 Testnet Mode" : "🌐 Mainnet Mode"}
             </button>
+            {/* Solana wallet in mobile dropdown */}
+            <div>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1.5">Solana Wallet</p>
+              <SolanaWalletBtn fullWidth />
+            </div>
           </div>
         </div>
       )}
