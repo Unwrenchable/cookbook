@@ -17,21 +17,23 @@ import { VanityAddressGenerator } from "@/components/VanityAddressGenerator";
 import { LPLockerPanel } from "@/components/LPLockerPanel";
 import { SwapWidget } from "@/components/SwapWidget";
 import { ReferralPanel } from "@/components/ReferralPanel";
+import { VerifyPanel } from "@/components/VerifyPanel";
 import { TokenCard, type TokenCardProps } from "@/components/TokenCard";
 import { useDeployToken } from "@/hooks/useDeployToken";
 import { getChainById } from "@/lib/chains";
 import { useNetwork } from "@/lib/networkContext";
 import type { TokenFormData } from "@/lib/types";
 
-type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "vanity" | "dashboard" | "referral";
+type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "verify" | "vanity" | "dashboard" | "referral";
 type DiscoveryTab = "trending" | "new" | "graduate" | "cross-chain" | "top-earners";
 
-const VALID_TABS: Tab[] = ["evm", "solana-bridge", "lock", "swap", "vanity", "dashboard", "referral"];
+const VALID_TABS: Tab[] = ["evm", "solana-bridge", "lock", "swap", "verify", "vanity", "dashboard", "referral"];
 
 const SIDEBAR_TABS: { id: Tab; emoji: string; label: string; sublabel?: string }[] = [
   { id: "evm",           emoji: "🚀", label: "Launch",    sublabel: "EVM Token" },
   { id: "solana-bridge", emoji: "🔥", label: "Bridge",    sublabel: "Solana → EVM" },
   { id: "swap",          emoji: "💱", label: "Swap",      sublabel: "Quick Trade" },
+  { id: "verify",        emoji: "✅", label: "Verify",    sublabel: "Audit + $GOON" },
   { id: "dashboard",     emoji: "📋", label: "Portfolio", sublabel: "My Tokens" },
   { id: "lock",          emoji: "��", label: "Lock LP",   sublabel: "Anti-Rug" },
   { id: "vanity",        emoji: "🔮", label: "Vanity",    sublabel: "0x Prefix" },
@@ -467,6 +469,16 @@ function HomePageContent() {
                   <GlassCard className="mt-1">
                     <SwapWidget />
                   </GlassCard>
+                </div>
+              </div>
+            )}
+
+            {/* ── Verify ────────────────────────────────────────────── */}
+            {activeTab === "verify" && (
+              <div className="animate-fade-in-up">
+                <SectionLabel>Contract Verification</SectionLabel>
+                <div className="mt-1">
+                  <VerifyPanel />
                 </div>
               </div>
             )}
