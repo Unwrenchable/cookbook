@@ -15,6 +15,7 @@ const NAV_TABS = [
   { href: "/?tab=evm",           label: "Launch",    emoji: "🚀" },
   { href: "/?tab=solana-bridge", label: "Bridge",    emoji: "🔥" },
   { href: "/?tab=swap",          label: "Swap",      emoji: "💱" },
+  { href: "/?tab=verify",        label: "Verify",    emoji: "✅" },
   { href: "/?tab=dashboard",     label: "Portfolio", emoji: "📋" },
   { href: "/?tab=vanity",        label: "Tools",     emoji: "🔮" },
 ] as const;
