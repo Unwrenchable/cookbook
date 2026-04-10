@@ -95,7 +95,7 @@ function mockScan(address: string): ScanResult {
     trustScore,
     risks,
     isMintable:   false,
-    isProxy:      trustScore > 80,
+    isProxy:      trustScore < 80,
     hasBlacklist: trustScore < 70,
   };
 }
@@ -172,7 +172,7 @@ export function VerifyPanel() {
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash: payTxHash });
 
   // Mark as verified when payment confirms
-  const wasVerified = isVerified || isConfirmed;
+  const hasVerification = isVerified || isConfirmed;
 
   const isValidAddr = contractAddr.startsWith("0x") && contractAddr.length === 42;
 
@@ -209,7 +209,7 @@ export function VerifyPanel() {
       setPayTxHash(hash);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      setPayError(msg.includes("User rejected") ? "Transaction rejected." : msg.slice(0, 120));
+      setPayError(msg.includes("User rejected") ? "Transaction rejected." : `${msg.slice(0, 120)}${msg.length > 120 ? "…" : ""}`);
     }
   }, [isConnected, writeContractAsync]);
 
@@ -219,9 +219,9 @@ export function VerifyPanel() {
     const params = new URLSearchParams();
     params.set("tab", "evm");
     if (isValidAddr) params.set("contract", contractAddr);
-    if (wasVerified) params.set("verified", "true");
+    if (hasVerification) params.set("verified", "true");
     router.push(`/?${params.toString()}`);
-  }, [router, contractAddr, isValidAddr, wasVerified]);
+  }, [router, contractAddr, isValidAddr, hasVerification]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -234,7 +234,7 @@ export function VerifyPanel() {
           <div>
             <h2 className="text-lg font-black text-white flex items-center gap-2">
               ✅ GoonVerify
-              {wasVerified && (
+              {hasVerification && (
                 <span className="ml-1 rounded-full border border-green-500/40 bg-green-500/15 px-2.5 py-0.5 text-xs font-bold text-green-400">
                   GoonVerified ✅
                 </span>
@@ -348,7 +348,7 @@ export function VerifyPanel() {
           </div>
 
           {/* Premium upsell */}
-          {!wasVerified && (
+          {!hasVerification && (
             <div className="rounded-2xl border border-orange-500/30 bg-gradient-to-br from-orange-500/10 to-brand-500/10 p-5 space-y-3">
               <div className="flex items-start justify-between">
                 <div>
@@ -406,7 +406,7 @@ export function VerifyPanel() {
           )}
 
           {/* Post-verification state */}
-          {wasVerified && (
+          {hasVerification && (
             <div className="rounded-2xl border border-green-500/30 bg-green-500/10 p-4 text-center space-y-1">
               <p className="text-2xl">🎉</p>
               <p className="text-sm font-black text-green-400">GoonVerified!</p>
@@ -425,7 +425,7 @@ export function VerifyPanel() {
           onClick={handleGoonItNow}
           className="w-full rounded-2xl py-4 text-base font-black text-black transition-all bg-gradient-to-r from-brand-500 via-green-400 to-orange-400 hover:from-brand-400 hover:via-green-300 hover:to-orange-300 glow-neon hover:glow-neon-lg"
         >
-          🚀 GOON IT NOW — Launch with {wasVerified ? "Verified ✅" : "This"} Contract
+          🚀 GOON IT NOW — Launch with {hasVerification ? "Verified ✅" : "This"} Contract
         </button>
       )}
     </div>
