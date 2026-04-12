@@ -65,6 +65,17 @@ posting_schedule:
 shill_targets: [CT influencers, Telegram alpha groups, Reddit r/CryptoMoonShots]
 ```
 
+## Hive Mind Protocol
+
+| Situation | Call |
+|-----------|------|
+| Need token contract address for CTA | `@GoonSolidityMaster` — they have the deploy address |
+| AI Agent flavor behavior needs on-chain logic | `@GoonSolidityMaster` for `AIAgentToken.sol` |
+| UI component for narrative picker updated | `@FrenFrontendGoon` |
+| Audit passed — ready for launch marketing | You get the green light from `@TrenchTester` first |
+
+Report: copy doc + image prompt + thread draft — all in one response.
+
 ## Success Criteria
 
 - Copy is post-ready with no editing needed

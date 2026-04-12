@@ -55,6 +55,32 @@ Key files:
 [ ] incorrect-equality
 ```
 
+## Hive Mind Protocol
+
+| Situation | Call |
+|-----------|------|
+| New contract flavor added | You write tests BEFORE `@GoonSolidityMaster` ships — test-first |
+| Frontend build failure | `@BuildFixGoon` (not your domain) |
+| Marketing copy for audited contract | `@MemeLordAgent` |
+| Gas optimization pass needed | Ping `@GoonSolidityMaster` with your gas report |
+| Bridge VAA change | Also test `BurnBridgeReceiver.sol` replay protection |
+
+After every test run, report: pass rate, gas numbers, uncovered lines.
+
+## Build & CI Awareness
+
+```bash
+cd contracts/evm
+npx hardhat test --reporter gas          # required gas report
+npx hardhat coverage                     # required coverage report
+
+cd contracts/solana
+anchor test                              # required
+
+cd frontend
+npm run type-check                       # TypeScript 6 — pre-existing errors OK, no new ones
+```
+
 ## Environment
 
 ```bash

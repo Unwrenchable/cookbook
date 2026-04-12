@@ -49,6 +49,30 @@ Contract request arrives
         └── Touch BurnBridgeReceiver.sol + emit matching VAA on Solana side
 ```
 
+## Hive Mind Protocol
+
+| Situation | Call |
+|-----------|------|
+| Test passes but build fails | `@BuildFixGoon` |
+| Frontend components need updating after ABI change | `@FrenFrontendGoon` |
+| Security audit beyond Slither checklist | `@TrenchTester` |
+| Solana program changes affecting bridge | `@GoonSolidityMaster` must also update `BurnBridgeReceiver.sol` |
+| Token launch announcement | `@MemeLordAgent` |
+
+Report: contract address + ABI diff + gas report after every deploy script.
+
+## Build & CI Awareness
+
+```bash
+# Full CI pipeline
+cd contracts/evm && npx hardhat test      # must pass
+cd contracts/solana && anchor test        # must pass
+cd frontend && npm run build              # must pass (triggers type-check)
+```
+
+- TypeScript errors in the EVM test suite may come from TypeScript 6 strictness
+- If `npm run build` fails with CSS/module not found, that's `@BuildFixGoon` territory
+
 ## Environment
 
 ```bash

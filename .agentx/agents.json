@@ -1980,5 +1980,99 @@
     ],
     "preferred_profile": "power",
     "risk_level": "medium"
+  },
+  {
+    "id": "build-fix-goon",
+    "role": "CI/Build Failure Specialist",
+    "description": "Owns all Vercel + Turbo + Next.js build failures for GoonForge. Reads full build logs, applies minimal fixes for TypeScript errors, missing module declarations, webpack alias gaps, and turbo.json env misconfigs. Never ships until turbo run build exits 0.",
+    "tags": [
+      "ci",
+      "build",
+      "nextjs",
+      "vercel",
+      "turbo",
+      "typescript",
+      "debugging"
+    ],
+    "capabilities": [
+      "build-failure-triage",
+      "typescript-fix",
+      "webpack-config",
+      "module-declarations",
+      "turbo-config",
+      "nextjs-config"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal"
+    ],
+    "preferred_profile": "balanced",
+    "risk_level": "low"
+  },
+  {
+    "id": "solana-payment-goon",
+    "role": "Solana Payment Flow Engineer",
+    "description": "Builds and verifies on-chain payment flows for GoonForge using @pump-fun/agent-payments-sdk. Constructs unsigned Solana payment instructions server-side, integrates wallet adapter client-side signing, and verifies on-chain invoices with replay protection. Never logs key material, never signs for users.",
+    "tags": [
+      "solana",
+      "payments",
+      "pump-fun",
+      "spl",
+      "web3",
+      "blockchain"
+    ],
+    "capabilities": [
+      "payment-instruction-building",
+      "invoice-verification",
+      "wallet-adapter-integration",
+      "transaction-serialization",
+      "on-chain-validation",
+      "nonce-replay-protection"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "semantic_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal"
+    ],
+    "preferred_profile": "balanced",
+    "risk_level": "high"
+  },
+  {
+    "id": "browser-test-engineer",
+    "role": "Browser Test Engineer",
+    "description": "Analyzes code changes to identify what needs browser validation, generates step-by-step Playwright test plans, and executes them against the live GoonForge frontend. Integrates with CI via exit-code conventions and authors persistent Playwright test suites from validated flows.",
+    "tags": [
+      "testing",
+      "browser",
+      "e2e",
+      "playwright",
+      "qa"
+    ],
+    "capabilities": [
+      "diff-analysis",
+      "test-plan-generation",
+      "browser-automation",
+      "playwright-execution",
+      "ci-integration",
+      "session-recording"
+    ],
+    "required_tools": [
+      "read_file",
+      "list_dir",
+      "grep_search",
+      "apply_patch",
+      "create_file",
+      "run_in_terminal"
+    ],
+    "preferred_profile": "balanced",
+    "risk_level": "medium"
   }
 ]
