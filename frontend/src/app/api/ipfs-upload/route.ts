@@ -6,16 +6,39 @@ import { NextRequest, NextResponse } from "next/server";
 
 const PINATA_BASE = "https://api.pinata.cloud";
 
+/** 5 MB max logo size. */
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
+/** Allowed MIME types for token logos. */
+const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"]);
+/** Allowed file extensions (as a secondary guard). */
+const ALLOWED_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const name = (formData.get("name") as string | null) ?? "";
-    const symbol = (formData.get("symbol") as string | null) ?? "";
-    const description = (formData.get("description") as string | null) ?? "";
+    const name = ((formData.get("name") as string | null) ?? "").slice(0, 100);
+    const symbol = ((formData.get("symbol") as string | null) ?? "").slice(0, 20);
+    const description = ((formData.get("description") as string | null) ?? "").slice(0, 500);
 
     if (!file) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
+
+    // File type validation
+    if (!ALLOWED_MIME_TYPES.has(file.type) || !ALLOWED_EXTENSIONS.test(file.name)) {
+      return NextResponse.json(
+        { error: "Invalid file type. Only PNG, JPEG, GIF, WebP, and SVG are allowed." },
+        { status: 400 }
+      );
+    }
+
+    // File size validation
+    if (file.size > MAX_FILE_BYTES) {
+      return NextResponse.json(
+        { error: "File too large. Maximum size is 5 MB." },
+        { status: 413 }
+      );
     }
 
     const jwt = process.env.PINATA_JWT;

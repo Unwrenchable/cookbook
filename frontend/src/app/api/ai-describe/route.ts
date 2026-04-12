@@ -16,23 +16,40 @@ const FALLBACK_DESCRIPTIONS: Record<string, string> = {
   "📈 Pump → CEX (Graduation)": "Starts as a bonding curve, graduates to CEX when the ETH threshold hits. Pump the curve, then ring the bell. GG.",
 };
 
+/** Input length caps to prevent prompt injection and API cost drain. */
+const MAX_NAME_LEN   = 64;
+const MAX_SYMBOL_LEN = 16;
+const MAX_FLAVOR_LEN = 64;
+const MAX_VIBES_LEN  = 120;
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as { name?: string; symbol?: string; flavor?: string; vibes?: string };
-    const { name = "Token", symbol = "TKN", flavor = "Standard ERC20", vibes = "degen meme crypto" } = body;
+    const {
+      name   = "Token",
+      symbol = "TKN",
+      flavor = "Standard ERC20",
+      vibes  = "degen meme crypto",
+    } = body;
+
+    // Sanitise + truncate — prevents prompt injection and runaway token costs
+    const safeName   = String(name).replace(/[^\w\s$.,!?-]/g, "").slice(0, MAX_NAME_LEN);
+    const safeSymbol = String(symbol).replace(/[^\w$]/g, "").slice(0, MAX_SYMBOL_LEN);
+    const safeFlavor = String(flavor).replace(/[^\w\s()👋🏛️⚙️📈🤖/.,+-]/g, "").slice(0, MAX_FLAVOR_LEN);
+    const safeVibes  = String(vibes).replace(/[^\w\s.,!-]/g, "").slice(0, MAX_VIBES_LEN);
 
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
       const description =
-        FALLBACK_DESCRIPTIONS[flavor] ??
-        `${name} (${symbol}) is a next-gen token built for the degen community. Ape in, hold tight, and let the charts do the talking.`;
+        FALLBACK_DESCRIPTIONS[safeFlavor] ??
+        `${safeName} (${safeSymbol}) is a next-gen token built for the degen community. Ape in, hold tight, and let the charts do the talking.`;
       return NextResponse.json({ description });
     }
 
     const systemPrompt =
       "You are a degen crypto token description writer. Write punchy, hype, 2-3 sentence token descriptions for meme coins and DeFi tokens. Keep it under 100 words. No emojis in the text itself.";
-    const userPrompt = `Write a description for ${name} (${symbol}) — a ${flavor} token. Vibes: ${vibes}`;
+    const userPrompt = `Write a description for ${safeName} (${safeSymbol}) — a ${safeFlavor} token. Vibes: ${safeVibes}`;
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

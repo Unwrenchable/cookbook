@@ -143,8 +143,10 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
         _settlePending(msg.sender);
         s.amount -= amount;
         totalStaked -= amount;
-        isExcludedFromCap[msg.sender] = (s.amount > 0); // keep excluded while staking
+        // Update exclusion AFTER transfer so the cap is not enforced mid-unstake,
+        // which would permanently trap funds for users who hold > teamWalletCapBps.
         _transfer(address(this), msg.sender, amount);
+        isExcludedFromCap[msg.sender] = (s.amount > 0); // keep excluded while staking
         emit Unstaked(msg.sender, amount);
     }
 

@@ -19,8 +19,6 @@ import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-tok
 import {
   createWalletClient,
   custom,
-  encodeAbiParameters,
-  keccak256,
 } from "viem";
 import {
   BURN_TIERS,
@@ -456,15 +454,8 @@ async function submitVAAToEVM(
 
   const receiverAddress = target.receiverAddress as `0x${string}`;
 
-  // Build the message key for replay prevention:
-  // keccak256(abi.encodePacked(emitterChain, emitterAddress, sequence))
-  const emitterAddrPadded = (`0x${vaa.emitterAddr.padStart(64, "0")}`) as `0x${string}`;
-  const messageKey = keccak256(
-    encodeAbiParameters(
-      [{ type: "uint16" }, { type: "bytes32" }, { type: "uint64" }],
-      [vaa.emitterChain, emitterAddrPadded, BigInt(vaa.sequence)]
-    )
-  );
+  // The contract now derives the replay-prevention key from keccak256(payload) internally.
+  // We no longer build or pass a messageKey from the client side.
 
   const walletClient = createWalletClient({
     transport: custom((window as Window & { ethereum: unknown }).ethereum),
@@ -477,7 +468,7 @@ async function submitVAAToEVM(
       address:      receiverAddress,
       abi:          BURN_BRIDGE_RECEIVER_ABI,
       functionName: "receiveRelayedMessage",
-      args:         [vaa.payloadBytes, messageKey],
+      args:         [vaa.payloadBytes],
       chain:        null,
     });
 

@@ -137,6 +137,7 @@ cd contracts/evm
 cp .env.example .env
 pnpm compile
 pnpm test
+pnpm preflight
 
 # 3. Frontend – dev server
 cd ../../frontend
@@ -145,6 +146,31 @@ cp .env.example .env.local
 pnpm dev
 # Open http://localhost:3000
 ```
+
+### Testnet Deploy Runbook (EVM)
+
+```bash
+cd contracts/evm
+
+# 1) Configure secrets
+cp .env.example .env
+# Fill PRIVATE_KEY + ALCHEMY_API_KEY (+ optional explorer keys)
+
+# 2) Compile once
+pnpm compile
+
+# 3) Preflight target network
+pnpm preflight:sepolia
+# or: pnpm preflight:bscTestnet | preflight:polygonAmoy | preflight:arbitrumSepolia | preflight:baseSepolia | preflight:optimismSepolia
+
+# 4) Deploy factory + implementations + LP locker
+pnpm deploy:sepolia
+
+# 5) (Optional) Deploy BurnBridgeReceiver
+pnpm deploy:bridge:sepolia
+```
+
+If preflight fails, fix missing env vars/funding first; deployment should only be run after preflight passes.
 
 ---
 
@@ -181,7 +207,12 @@ ARBISCAN_API_KEY=...
 BASESCAN_API_KEY=...
 # BurnBridgeReceiver
 SOLANA_EMITTER=0x...       # token-burn-bridge program ID as bytes32 hex
-MINTABLE_TOKEN=0x...       # ERC20 to mint after bridge calls
+MINTABLE_TOKEN_SEPOLIA=0x...
+MINTABLE_TOKEN_BSCTESTNET=0x...
+MINTABLE_TOKEN_POLYGONAMOY=0x...
+MINTABLE_TOKEN_ARBITRUMSEPOLIA=0x...
+MINTABLE_TOKEN_BASESEPOLIA=0x...
+MINTABLE_TOKEN_OPTIMISMSEPOLIA=0x...
 MINT_RATIO=1000000000      # SPL (9 dec) → ERC20 (18 dec) ratio
 ```
 

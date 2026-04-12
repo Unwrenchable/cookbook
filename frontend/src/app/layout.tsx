@@ -2,9 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
-import { Providers } from "@/components/Providers";
-import { Navbar } from "@/components/Navbar";
 import { websiteSchema, appSchema } from "@/components/JsonLd";
+import { AppShellClient } from "@/components/AppShellClient";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -125,10 +124,7 @@ export default function RootLayout({
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(appSchema) }}
         />
-        <Providers>
-          <Navbar />
-          {children}
-        </Providers>
+        <AppShellClient>{children}</AppShellClient>
       </body>
     </html>
   );

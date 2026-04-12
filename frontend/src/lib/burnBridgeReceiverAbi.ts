@@ -18,9 +18,9 @@ export const BURN_BRIDGE_RECEIVER_ABI = [
     name: "receiveRelayedMessage",
     type: "function",
     stateMutability: "nonpayable",
+    // messageKey is now derived on-chain from keccak256(payload) — not a parameter
     inputs: [
-      { name: "payload",    type: "bytes"   },
-      { name: "messageKey", type: "bytes32" },
+      { name: "payload", type: "bytes" },
     ],
     outputs: [],
   },

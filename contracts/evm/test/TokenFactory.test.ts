@@ -456,18 +456,15 @@ describe("LPLocker", function () {
     await locker.waitForDeployment();
 
     // Deploy a mock ERC20 to use as LP token
-    const ERC20Factory = await ethers.getContractFactory("StandardERC20");
-    lpToken = await ERC20Factory.deploy();
-    await lpToken.waitForDeployment();
-
-    // Initialize the mock LP token with user1 as owner
-    await lpToken.initialize(
+    const ERC20Factory = await ethers.getContractFactory("MockERC20");
+    lpToken = await ERC20Factory.deploy(
       "MockLP",
       "MLP",
-      ethers.parseUnits("1000000", 0),
       18,
+      ethers.parseEther("1000000"),
       user1.address
     );
+    await lpToken.waitForDeployment();
   });
 
   it("Locks LP tokens and emits Locked event", async function () {

@@ -42,6 +42,38 @@ const PUBLIC_RPC_FALLBACKS: Record<string, string> = {
   "11155420": "https://sepolia.optimism.io",        // Optimism Foundation – Sepolia testnet
 };
 
+/** Maximum allowed JSON-RPC body size (32 KB). Prevents payload-flooding attacks. */
+const MAX_BODY_BYTES = 32 * 1024;
+
+/**
+ * Allowlist of JSON-RPC methods the proxy will forward.
+ * Restricts the proxy to read-only / standard wallet operations so attackers
+ * cannot abuse server-side Alchemy credits with expensive debug/trace calls.
+ */
+const ALLOWED_METHODS = new Set([
+  "eth_blockNumber",
+  "eth_call",
+  "eth_chainId",
+  "eth_estimateGas",
+  "eth_gasPrice",
+  "eth_getBalance",
+  "eth_getBlockByHash",
+  "eth_getBlockByNumber",
+  "eth_getBlockReceipts",
+  "eth_getCode",
+  "eth_getLogs",
+  "eth_getStorageAt",
+  "eth_getTransactionByHash",
+  "eth_getTransactionCount",
+  "eth_getTransactionReceipt",
+  "eth_maxPriorityFeePerGas",
+  "eth_sendRawTransaction",
+  "eth_subscribe",
+  "eth_unsubscribe",
+  "net_version",
+  "web3_clientVersion",
+]);
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ chain: string }> }
@@ -66,11 +98,39 @@ export async function POST(
     );
   }
 
+  // Enforce body size limit before reading
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+  }
+
   let body: string;
   try {
     body = await request.text();
   } catch {
     return NextResponse.json({ error: "Failed to read request body" }, { status: 400 });
+  }
+
+  if (body.length > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+  }
+
+  // Validate JSON and enforce method allowlist
+  let parsed: { method?: unknown } | Array<{ method?: unknown }>;
+  try {
+    parsed = JSON.parse(body) as typeof parsed;
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const requests = Array.isArray(parsed) ? parsed : [parsed];
+  for (const rpc of requests) {
+    if (typeof rpc.method !== "string" || !ALLOWED_METHODS.has(rpc.method)) {
+      return NextResponse.json(
+        { error: `Method not allowed: ${String(rpc.method)}` },
+        { status: 403 }
+      );
+    }
   }
 
   let upstream: Response;

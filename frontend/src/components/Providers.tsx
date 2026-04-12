@@ -3,13 +3,18 @@
  */
 "use client";
 
+import dynamic from "next/dynamic";
 import { darkTheme, RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { wagmiConfig } from "@/lib/wagmiConfig";
-import { SolanaProviders } from "@/components/SolanaProviders";
 import { NetworkProvider, useNetwork } from "@/lib/networkContext";
 import "@rainbow-me/rainbowkit/styles.css";
+
+const SolanaProviders = dynamic(
+  () => import("@/components/SolanaProviders").then((m) => m.SolanaProviders),
+  { ssr: false }
+);
 
 const queryClient = new QueryClient();
 

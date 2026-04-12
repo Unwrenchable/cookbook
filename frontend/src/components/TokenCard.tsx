@@ -58,12 +58,12 @@ export function TokenCard({
   const ticker = symbol.replace(/^\$/, "").slice(0, 3);
 
   return (
-    <div className="glass-card glass-card-hover rounded-xl p-3 cursor-pointer group">
+    <div className="glass-card glass-card-hover rounded-2xl p-3.5 cursor-pointer group">
       {/* Top row */}
       <div className="flex items-start gap-2.5 mb-3">
         {/* Avatar */}
         <div
-          className={`h-9 w-9 shrink-0 rounded-full bg-gradient-to-br ${avatarColor} flex items-center justify-center text-xs font-black`}
+          className={`h-10 w-10 shrink-0 rounded-xl bg-gradient-to-br ${avatarColor} flex items-center justify-center text-xs font-black ring-1 ring-white/5`}
         >
           {ticker}
         </div>
@@ -71,17 +71,17 @@ export function TokenCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="font-bold text-white text-sm">{symbol}</span>
             {isGraduating && (
-              <span className="rounded-full bg-yellow-500/20 border border-yellow-500/40 px-1.5 py-px text-[9px] font-bold text-yellow-400 uppercase tracking-wide">
+              <span className="rounded-full bg-yellow-500/15 border border-yellow-500/35 px-1.5 py-px text-[9px] font-bold text-yellow-400 uppercase tracking-wide">
                 🎓 Grad
               </span>
             )}
           </div>
           {name && (
-            <p className="text-[11px] text-gray-500 truncate mt-0.5">{name}</p>
+            <p className="text-[11px] text-slate-500 truncate mt-0.5">{name}</p>
           )}
         </div>
         <span
-          className={`shrink-0 rounded-md border px-1.5 py-0.5 text-[10px] font-semibold ${chainMeta.badge}`}
+          className={`shrink-0 rounded-lg border px-1.5 py-0.5 text-[10px] font-semibold ${chainMeta.badge}`}
         >
           {chainMeta.emoji} {chain}
         </span>
@@ -89,30 +89,30 @@ export function TokenCard({
 
       {/* Stats grid */}
       <div className="grid grid-cols-3 gap-1.5 text-center">
-        <div className="rounded-lg bg-dark-muted/60 px-1 py-1.5">
-          <p className={`text-[11px] font-bold ${isPositive ? "text-brand-400" : "text-red-400"}`}>
+        <div className="rounded-xl bg-surface-3/60 px-1 py-1.5">
+          <p className={`text-[11px] font-bold tabular-nums ${isPositive ? "text-brand-400" : "text-red-400"}`}>
             {velocity}
           </p>
-          <p className="text-[9px] text-gray-600 mt-0.5">velocity</p>
+          <p className="text-[9px] text-slate-600 mt-0.5">velocity</p>
         </div>
-        <div className="rounded-lg bg-dark-muted/60 px-1 py-1.5">
-          <p className="text-[11px] font-semibold text-white truncate">{volume}</p>
-          <p className="text-[9px] text-gray-600 mt-0.5">volume</p>
+        <div className="rounded-xl bg-surface-3/60 px-1 py-1.5">
+          <p className="text-[11px] font-semibold text-white truncate tabular-nums">{volume}</p>
+          <p className="text-[9px] text-slate-600 mt-0.5">volume</p>
         </div>
-        <div className="rounded-lg bg-dark-muted/60 px-1 py-1.5">
-          <p className="text-[11px] font-semibold text-white">{age}</p>
-          <p className="text-[9px] text-gray-600 mt-0.5">age</p>
+        <div className="rounded-xl bg-surface-3/60 px-1 py-1.5">
+          <p className="text-[11px] font-semibold text-white tabular-nums">{age}</p>
+          <p className="text-[9px] text-slate-600 mt-0.5">age</p>
         </div>
       </div>
 
       {/* Graduation progress */}
       {isGraduating && graduationPct !== undefined && (
-        <div className="mt-2">
-          <div className="flex justify-between text-[9px] mb-0.5">
-            <span className="text-gray-500">Graduation progress</span>
-            <span className="text-yellow-400 font-semibold">{graduationPct}%</span>
+        <div className="mt-2.5">
+          <div className="flex justify-between text-[9px] mb-1">
+            <span className="text-slate-500">Graduation progress</span>
+            <span className="text-yellow-400 font-semibold tabular-nums">{graduationPct}%</span>
           </div>
-          <div className="h-1 rounded-full bg-dark-muted overflow-hidden">
+          <div className="h-1 rounded-full bg-surface-4 overflow-hidden">
             <div
               className="h-full rounded-full bg-gradient-to-r from-yellow-500 to-brand-400 transition-all duration-500"
               style={{ width: `${graduationPct}%` }}
@@ -122,9 +122,9 @@ export function TokenCard({
       )}
 
       {/* Footer: traders + actions */}
-      <div className="flex items-center justify-between mt-2.5 pt-2 border-t border-dark-border/50">
+      <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-surface-5/50">
         {traders !== undefined ? (
-          <span className="text-[10px] text-gray-500">
+          <span className="text-[10px] text-slate-500 tabular-nums">
             👥 {traders.toLocaleString()}
           </span>
         ) : (
@@ -134,14 +134,14 @@ export function TokenCard({
           <button
             type="button"
             onClick={() => { /* TODO: navigate to token explorer */ }}
-            className="rounded-md border border-dark-border bg-dark-muted px-2 py-1 text-[10px] font-semibold text-gray-400 hover:text-white hover:border-gray-500 transition-colors"
+            className="rounded-lg border border-surface-5/60 bg-surface-3/80 px-2 py-1 text-[10px] font-semibold text-slate-400 hover:text-white hover:border-surface-6/80 transition-colors"
           >
             View
           </button>
           <button
             type="button"
             onClick={() => { /* TODO: open swap widget for token */ }}
-            className="rounded-md border border-brand-500/40 bg-brand-500/10 px-2 py-1 text-[10px] font-semibold text-brand-400 hover:bg-brand-500/20 hover:border-brand-500/60 transition-colors"
+            className="rounded-lg border border-brand-500/40 bg-brand-500/10 px-2 py-1 text-[10px] font-semibold text-brand-400 hover:bg-brand-500/20 hover:border-brand-500/60 transition-colors"
           >
             Trade
           </button>

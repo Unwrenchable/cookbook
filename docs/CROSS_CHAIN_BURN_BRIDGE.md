@@ -77,7 +77,7 @@ uint64   nonce               (8 bytes, big-endian)
 
 **Solidity contract** per EVM chain with:
 - `receiveMessage(encodedVAA)` — full Wormhole VAA path (production)
-- `receiveRelayedMessage(payload, messageKey)` — trusted-relayer path (development)
+- `receiveRelayedMessage(payload)` — trusted-relayer path (development); replay key is derived on-chain via `keccak256(payload)`
 - `_processPayload(payload)` — decodes payload, mints ERC20
 
 **Security features:**

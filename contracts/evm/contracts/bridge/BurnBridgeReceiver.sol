@@ -84,19 +84,24 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
 
     // ─── Core: receive message ────────────────────────────────────────────────
 
-    function receiveMessage(bytes calldata encodedVAA) external nonReentrant {
+    function receiveMessage(bytes calldata) external pure {
         // Reverts explicitly until Wormhole dependencies are pinned and integrated.
         revert("BurnBridgeReceiver: Wormhole VAA verification not implemented; use receiveRelayedMessage");
-        
-        // This is to suppress the unused variable warning for the scaffold
-        encodedVAA;
     }
 
-    function receiveRelayedMessage(
-        bytes calldata payload,
-        bytes32        messageKey
-    ) external nonReentrant {
+    /**
+     * @notice Receives a pre-decoded bridge payload from a trusted off-chain relayer.
+     * @dev    The replay-prevention key is derived from the payload content rather
+     *         than accepted as a caller parameter.  Accepting a caller-supplied key
+     *         would allow a compromised relayer to bypass replay protection by
+     *         submitting the same payload with a different key each time.
+     * @param  payload ABI-encoded bridge payload (114 bytes minimum).
+     */
+    function receiveRelayedMessage(bytes calldata payload) external nonReentrant {
         require(isTrustedRelayer[msg.sender], "BurnBridgeReceiver: not a trusted relayer");
+
+        // Derive replay key from payload content — cannot be manipulated by caller
+        bytes32 messageKey = keccak256(payload);
         require(!processedMessages[messageKey], "BurnBridgeReceiver: already processed");
         processedMessages[messageKey] = true;
 

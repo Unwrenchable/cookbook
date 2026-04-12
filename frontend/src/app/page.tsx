@@ -5,24 +5,26 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import dynamic from "next/dynamic";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, useChainId } from "wagmi";
 import { ChainSelector } from "@/components/ChainSelector";
 import { TokenForm } from "@/components/TokenForm";
 import { DeployResult } from "@/components/DeployResult";
-import { TokenDashboard } from "@/components/TokenDashboard";
-import { SolanaLaunchPanel } from "@/components/SolanaLaunchPanel";
-import { VanityAddressGenerator } from "@/components/VanityAddressGenerator";
-import { LPLockerPanel } from "@/components/LPLockerPanel";
-import { SwapWidget } from "@/components/SwapWidget";
-import { ReferralPanel } from "@/components/ReferralPanel";
-import { VerifyPanel } from "@/components/VerifyPanel";
 import { TokenCard, type TokenCardProps } from "@/components/TokenCard";
 import { useDeployToken } from "@/hooks/useDeployToken";
 import { getChainById } from "@/lib/chains";
 import { useNetwork } from "@/lib/networkContext";
 import type { TokenFormData } from "@/lib/types";
+
+const TokenDashboard = dynamic(() => import("@/components/TokenDashboard").then((m) => m.TokenDashboard), { ssr: false });
+const SolanaLaunchPanel = dynamic(() => import("@/components/SolanaLaunchPanel").then((m) => m.SolanaLaunchPanel), { ssr: false });
+const VanityAddressGenerator = dynamic(() => import("@/components/VanityAddressGenerator").then((m) => m.VanityAddressGenerator), { ssr: false });
+const LPLockerPanel = dynamic(() => import("@/components/LPLockerPanel").then((m) => m.LPLockerPanel), { ssr: false });
+const SwapWidget = dynamic(() => import("@/components/SwapWidget").then((m) => m.SwapWidget), { ssr: false });
+const ReferralPanel = dynamic(() => import("@/components/ReferralPanel").then((m) => m.ReferralPanel), { ssr: false });
+const VerifyPanel = dynamic(() => import("@/components/VerifyPanel").then((m) => m.VerifyPanel), { ssr: false });
 
 type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "verify" | "vanity" | "dashboard" | "referral";
 type DiscoveryTab = "trending" | "new" | "graduate" | "cross-chain" | "top-earners";
@@ -158,12 +160,12 @@ function HomePageContent() {
     <div className="min-h-screen bg-dark-bg text-white">
 
       {/* ── Ticker bar ──────────────────────────────────────────────────── */}
-      <div className="border-b border-dark-border bg-dark-card/50 py-2 overflow-hidden">
+      <div className="border-b border-surface-5/60 bg-surface-1/70 py-2 overflow-hidden">
         <div className="ticker-wrapper">
           <div className="ticker-inner">
             {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
-              <span key={i} className="inline-flex items-center gap-1 mx-6 text-xs text-gray-400 shrink-0">
-                <span className="text-brand-500">◆</span>
+              <span key={i} className="inline-flex items-center gap-1.5 mx-8 text-[11px] text-slate-400 shrink-0 font-medium">
+                <span className="text-brand-500 text-[8px]">◆</span>
                 {item}
               </span>
             ))}
@@ -172,55 +174,60 @@ function HomePageContent() {
       </div>
 
       {/* ── Hero ────────────────────────────────────────────────────────── */}
-      <section className="relative border-b border-dark-border overflow-hidden">
-        {/* Gradient background */}
-        <div className="absolute inset-0 bg-gradient-to-b from-brand-500/5 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-px w-2/3 bg-gradient-to-r from-transparent via-brand-500/40 to-transparent" />
+      <section className="relative border-b border-surface-5/60 hero-orbs bg-dots">
+        {/* Top glow line */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 h-px w-3/4 bg-gradient-to-r from-transparent via-brand-500/30 to-transparent" />
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-surface-0 to-transparent pointer-events-none" />
 
-        <div className="relative mx-auto max-w-4xl px-4 py-12 text-center">
-          {/* Badge */}
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1">
+        <div className="relative mx-auto max-w-4xl px-4 py-14 text-center">
+          {/* Live badge */}
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-brand-500/25 bg-brand-500/8 px-4 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse" />
-            <span className="text-[11px] font-semibold text-brand-400 uppercase tracking-widest">
-              Multi-Chain Token Launchpad
+            <span className="text-[11px] font-semibold text-brand-400 uppercase tracking-[0.15em]">
+              Multi-Chain Token Launchpad · Live on 9 Networks
             </span>
           </div>
 
-          <h1 className="text-4xl sm:text-6xl font-black tracking-tight leading-[1.05] mb-4">
+          <h1 className="text-5xl sm:text-7xl font-black tracking-tight leading-[0.95] mb-5">
             <span className="text-white block">LAUNCH THE NEXT</span>
-            <span className="text-gradient-neon animate-glow-text block">100X TOKEN</span>
+            <span className="text-gradient-neon animate-glow-text block mt-1">100X TOKEN</span>
           </h1>
 
-          <p className="text-gray-400 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed mb-8">
+          <p className="text-slate-400 text-base sm:text-lg max-w-xl mx-auto leading-relaxed mb-9">
             Deploy any meme, any chain, any flavor in{" "}
             <span className="text-brand-400 font-semibold">under 60 seconds</span>.
-            Bonding curves, AI agents, PolitiFi, Solana burn-to-mint bridge — all in one click.
+            Bonding curves, AI agents, PolitiFi, Solana bridge — one click.
           </p>
 
           {/* CTA Buttons */}
-          <div className="flex flex-wrap gap-3 justify-center mb-10">
+          <div className="flex flex-wrap gap-3 justify-center mb-12">
             <button
               type="button"
               onClick={() => setActiveTab("evm")}
-              className="flex items-center gap-2 rounded-xl bg-brand-500 hover:bg-brand-400 text-black font-black px-6 py-3 text-sm transition-all glow-neon hover:glow-neon-lg"
+              className="group relative flex items-center gap-2 rounded-xl overflow-hidden px-7 py-3 text-sm font-black text-black transition-all"
+              style={{ background: "linear-gradient(135deg, #c4ff5a 0%, #a3e635 60%, #22d3ee 100%)" }}
             >
-              🚀 Launch Token
+              <span className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                style={{ background: "linear-gradient(135deg, #d4ff6a 0%, #b5f045 60%, #30e4ff 100%)" }} />
+              <span className="relative">🚀</span>
+              <span className="relative">Launch Token</span>
             </button>
             <button
               type="button"
               onClick={() => setDiscoveryTab("trending")}
-              className="flex items-center gap-2 rounded-xl border border-dark-border bg-dark-card hover:bg-dark-muted text-gray-200 font-semibold px-6 py-3 text-sm transition-all"
+              className="flex items-center gap-2 rounded-xl border border-surface-6 bg-surface-3/80 hover:bg-surface-4 hover:border-surface-6 text-slate-200 font-semibold px-7 py-3 text-sm transition-all"
             >
               🔥 Explore Tokens
             </button>
           </div>
 
-          {/* Stats bar — TODO: replace with live analytics API data */}
-          <div className="grid grid-cols-3 gap-4 max-w-lg mx-auto">
+          {/* Stats bar */}
+          <div className="grid grid-cols-3 gap-3 max-w-md mx-auto">
             {MOCK_STATS.map(({ label, value, icon }) => (
-              <div key={label} className="rounded-xl border border-dark-border bg-dark-card/80 px-3 py-3">
-                <p className="text-xs text-gray-500 mb-1">{icon} {label}</p>
-                <p className="text-lg font-black text-brand-400 stat-value">{value}</p>
+              <div key={label} className="rounded-2xl border border-surface-5/80 bg-surface-2/60 px-3 py-3.5 backdrop-blur-sm">
+                <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-1.5 font-medium">{icon} {label}</p>
+                <p className="text-xl font-black text-brand-400 stat-value">{value}</p>
               </div>
             ))}
           </div>
@@ -240,11 +247,11 @@ function HomePageContent() {
 
       {/* ── Main layout ─────────────────────────────────────────────────── */}
       <div className="mx-auto max-w-7xl px-4 py-6">
-        <div className="flex gap-5 lg:grid lg:grid-cols-[200px_1fr_280px]">
+        <div className="flex gap-5 lg:grid lg:grid-cols-[210px_1fr_276px]">
 
           {/* ── Left: Sidebar tab nav (desktop only) ──────────────────── */}
-          <aside className="hidden lg:flex flex-col gap-1 shrink-0">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600 px-3 mb-1">
+          <aside className="hidden lg:flex flex-col gap-0.5 shrink-0">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 px-3 mb-2">
               Navigate
             </p>
             {SIDEBAR_TABS.map(({ id, emoji, label, sublabel }) => (
@@ -254,15 +261,15 @@ function HomePageContent() {
                 onClick={() => setActiveTab(id)}
                 className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all ${
                   activeTab === id
-                    ? "bg-brand-500/15 border border-brand-500/30 text-white glow-neon"
-                    : "border border-transparent text-gray-400 hover:bg-dark-muted hover:text-gray-200"
+                    ? "bg-brand-500/12 border border-brand-500/25 text-white shadow-sm"
+                    : "border border-transparent text-slate-400 hover:bg-surface-4/70 hover:text-slate-200"
                 }`}
               >
                 <span className="text-base shrink-0">{emoji}</span>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold leading-tight">{label}</p>
+                  <p className="text-[13px] font-semibold leading-tight">{label}</p>
                   {sublabel && (
-                    <p className={`text-[10px] leading-tight ${activeTab === id ? "text-brand-500" : "text-gray-600"}`}>
+                    <p className={`text-[10px] leading-tight mt-0.5 ${activeTab === id ? "text-brand-500/80" : "text-slate-600"}`}>
                       {sublabel}
                     </p>
                   )}
@@ -274,16 +281,16 @@ function HomePageContent() {
             ))}
 
             {/* Separator */}
-            <div className="my-2 h-px bg-dark-border" />
+            <div className="my-3 h-px bg-surface-5/60" />
 
             {/* Chain indicator */}
-            <div className="rounded-xl border border-dark-border bg-dark-card px-3 py-2.5">
-              <p className="text-[10px] text-gray-600 uppercase tracking-wider mb-1">Current Network</p>
-              <p className="text-xs font-semibold text-gray-200 truncate">
+            <div className="rounded-xl border border-surface-5/80 bg-surface-2/60 px-3 py-3">
+              <p className="text-[10px] text-slate-600 uppercase tracking-wide mb-1.5 font-medium">Active Network</p>
+              <p className="text-xs font-semibold text-slate-200 truncate">
                 {chainConfig?.name ?? `Chain ${chainId}`}
               </p>
               {isTestnet && (
-                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-yellow-500/15 border border-yellow-500/30 px-2 py-0.5 text-[9px] font-semibold text-yellow-400">
+                <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-yellow-500/12 border border-yellow-500/25 px-2 py-0.5 text-[9px] font-semibold text-yellow-400">
                   <span className="h-1 w-1 rounded-full bg-yellow-400 animate-pulse" />
                   Testnet
                 </span>
@@ -295,7 +302,7 @@ function HomePageContent() {
           <main className="min-w-0 flex-1 space-y-4">
             {/* Mobile horizontal tab bar */}
             <div className="lg:hidden overflow-x-auto pb-1">
-              <div className="inline-flex gap-1 p-1 rounded-xl border border-dark-border bg-dark-card min-w-full sm:min-w-0">
+              <div className="inline-flex gap-1 p-1 rounded-xl border border-surface-5/60 bg-surface-2/80 min-w-full sm:min-w-0">
                 {SIDEBAR_TABS.map(({ id, emoji, label }) => (
                   <button
                     key={id}
@@ -303,8 +310,8 @@ function HomePageContent() {
                     onClick={() => setActiveTab(id)}
                     className={`shrink-0 flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap transition-all ${
                       activeTab === id
-                        ? "bg-brand-500/20 border border-brand-500/30 text-brand-300"
-                        : "text-gray-400 hover:bg-dark-muted hover:text-gray-200"
+                        ? "bg-brand-500/18 border border-brand-500/28 text-brand-300"
+                        : "text-slate-400 hover:bg-surface-4 hover:text-slate-200"
                     }`}
                   >
                     {emoji} {label}
@@ -318,9 +325,9 @@ function HomePageContent() {
               <div className="space-y-4 animate-fade-in-up">
                 {/* Progress stepper */}
                 <GlassCard>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-semibold text-white">Launch Progress</h3>
-                    <span className="text-xs text-gray-500">Step {evmStep} / 4</span>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-white">Launch Progress</h3>
+                    <span className="text-[11px] text-slate-500 font-medium">Step {evmStep} / 4</span>
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     {["Pick Network", "Configure", "Deploy", "Post-Launch"].map((step, i) => {
@@ -330,16 +337,16 @@ function HomePageContent() {
                       return (
                         <div
                           key={step}
-                          className={`rounded-lg border px-2 py-2 text-center text-xs transition-colors ${
+                          className={`rounded-xl border px-2 py-2.5 text-center text-xs transition-colors ${
                             isDone
-                              ? "border-brand-500/40 bg-brand-500/10 text-brand-300"
+                              ? "border-brand-500/35 bg-brand-500/8 text-brand-300"
                               : isActive
-                              ? "border-blue-400/40 bg-blue-500/10 text-blue-300"
-                              : "border-dark-border bg-dark-muted/50 text-gray-600"
+                              ? "border-accent-500/35 bg-accent-500/8 text-accent-300"
+                              : "border-surface-5/60 bg-surface-3/40 text-slate-600"
                           }`}
                         >
-                          <p className="font-bold">{isDone ? "✓" : n}</p>
-                          <p className="leading-tight mt-0.5">{step}</p>
+                          <p className="font-bold text-sm">{isDone ? "✓" : n}</p>
+                          <p className="leading-tight mt-0.5 text-[10px]">{step}</p>
                         </div>
                       );
                     })}
@@ -605,10 +612,10 @@ function HomePageContent() {
           {/* ── Right: Discovery Feed ─────────────────────────────────── */}
           <aside className="hidden lg:block shrink-0 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-600">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
                 Live Feed
               </p>
-              <span className="flex items-center gap-1 text-[10px] text-gray-600">
+              <span className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse" />
                 Live
               </span>
@@ -621,10 +628,10 @@ function HomePageContent() {
                   key={id}
                   type="button"
                   onClick={() => setDiscoveryTab(id)}
-                  className={`rounded-lg px-2 py-1 text-[10px] font-semibold whitespace-nowrap transition-all ${
+                  className={`rounded-lg px-2.5 py-1 text-[10px] font-semibold whitespace-nowrap transition-all ${
                     discoveryTab === id
-                      ? "bg-brand-500/20 border border-brand-500/30 text-brand-300"
-                      : "border border-transparent text-gray-500 hover:text-gray-300"
+                      ? "bg-brand-500/15 border border-brand-500/28 text-brand-300"
+                      : "border border-transparent text-slate-500 hover:text-slate-300 hover:bg-surface-4/50"
                   }`}
                 >
                   {label}
@@ -654,8 +661,8 @@ function HomePageContent() {
 
             {/* Graduated section */}
             <div className="mt-4">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-gray-600 mb-2">
-                🏁 Recent Grads
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 mb-2">
+                🏁 Recent Graduates
               </p>
               <div className="space-y-1.5">
                 {[
@@ -665,11 +672,11 @@ function HomePageContent() {
                 ].map(({ sym, dest }) => (
                   <div
                     key={sym}
-                    className="flex items-center justify-between rounded-lg border border-dark-border bg-dark-card/60 px-3 py-1.5 text-xs"
+                    className="flex items-center justify-between rounded-xl border border-surface-5/60 bg-surface-2/50 px-3 py-2 text-xs"
                   >
-                    <span className="font-semibold text-white">{sym}</span>
-                    <span className="text-gray-500">→ {dest}</span>
-                    <span className="text-brand-400">100%</span>
+                    <span className="font-bold text-white">{sym}</span>
+                    <span className="text-slate-500">→ {dest}</span>
+                    <span className="text-brand-400 font-semibold">100%</span>
                   </div>
                 ))}
               </div>
@@ -680,14 +687,14 @@ function HomePageContent() {
         {/* ── Mobile: Discovery Feed below content ────────────────────── */}
         <div className="lg:hidden mt-6 space-y-3">
           <div className="flex items-center justify-between">
-            <p className="text-sm font-semibold text-white">🔥 Token Discovery</p>
-            <span className="flex items-center gap-1 text-[10px] text-gray-500">
+            <p className="text-sm font-bold text-white">🔥 Token Discovery</p>
+            <span className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium">
               <span className="h-1.5 w-1.5 rounded-full bg-brand-400 animate-pulse" />
               Live
             </span>
           </div>
           <div className="overflow-x-auto pb-1">
-            <div className="inline-flex gap-1 p-1 rounded-xl border border-dark-border bg-dark-card">
+            <div className="inline-flex gap-1 p-1 rounded-xl border border-surface-5/60 bg-surface-2/80">
               {DISCOVERY_TABS.map(({ id, label }) => (
                 <button
                   key={id}
@@ -695,8 +702,8 @@ function HomePageContent() {
                   onClick={() => setDiscoveryTab(id)}
                   className={`shrink-0 rounded-lg px-3 py-1.5 text-[10px] font-semibold whitespace-nowrap transition-all ${
                     discoveryTab === id
-                      ? "bg-brand-500/20 border border-brand-500/30 text-brand-300"
-                      : "text-gray-500 hover:text-gray-300"
+                      ? "bg-brand-500/18 border border-brand-500/28 text-brand-300"
+                      : "text-slate-500 hover:text-slate-300"
                   }`}
                 >
                   {label}
@@ -726,15 +733,15 @@ function HomePageContent() {
       </div>
 
       {/* ── Footer ──────────────────────────────────────────────────────── */}
-      <footer className="mt-16 border-t border-dark-border py-8 px-4">
+      <footer className="mt-16 border-t border-surface-5/50 py-10 px-4">
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <p className="font-black text-brand-500 text-base tracking-tight">GOONFORGE.XYZ</p>
-            <p className="mt-1 text-xs text-gray-600">
+            <p className="font-black text-gradient-brand text-base tracking-tight">GOONFORGE.XYZ</p>
+            <p className="mt-1 text-xs text-slate-600">
               Solana burns activate every chain · Built by frens, for frens
             </p>
           </div>
-          <div className="flex items-center gap-4 text-xs text-gray-600">
+          <div className="flex items-center gap-4 text-xs text-slate-600">
             <a
               href="https://github.com/Unwrenchable/cookbook"
               target="_blank"
@@ -755,9 +762,7 @@ function HomePageContent() {
 
 function GlassCard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <div
-      className={`rounded-2xl border border-dark-border bg-dark-card p-5 ${className}`}
-    >
+    <div className={`glass-card p-5 ${className}`}>
       {children}
     </div>
   );
@@ -765,17 +770,17 @@ function GlassCard({ children, className = "" }: { children: React.ReactNode; cl
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-[11px] font-bold uppercase tracking-widest text-gray-500">{children}</h2>
+    <h2 className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500">{children}</h2>
   );
 }
 
 function PageSkeleton() {
   return (
-    <div className="min-h-screen bg-dark-bg flex items-center justify-center">
+    <div className="min-h-screen bg-surface-0 flex items-center justify-center">
       <div className="text-center space-y-3">
         <div className="text-3xl animate-float">⚒️</div>
-        <p className="text-brand-400 font-black text-lg animate-glow-text">GOONFORGE.XYZ</p>
-        <p className="text-gray-600 text-sm">Loading the forge…</p>
+        <p className="text-gradient-brand font-black text-lg animate-glow-text">GOONFORGE.XYZ</p>
+        <p className="text-slate-600 text-sm">Loading the forge…</p>
       </div>
     </div>
   );
