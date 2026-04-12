@@ -27,8 +27,8 @@ const nextConfig = {
             value: "camera=(), microphone=(), geolocation=()",
           },
           // Content-Security-Policy for a Web3 dApp:
-          // - script-src includes 'unsafe-eval' required by ethers.js / wagmi bundles
-          //   and some wallet extension injections.
+          // - script-src omits 'unsafe-eval'; wagmi v2 + viem do not use eval so it
+          //   is not required and removing it reduces XSS attack surface.
           // - connect-src allows our own /api/* proxy routes (which forward to Alchemy
           //   server-side), WalletConnect relayer, public Solana/BSC/Avalanche RPCs,
           //   Wormhole Scan API, and Pinata IPFS.
@@ -37,7 +37,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+              "script-src 'self' 'unsafe-inline'",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "img-src 'self' data: blob: https://ipfs.io https://*.ipfs.io https://cloudflare-ipfs.com https://raw.githubusercontent.com https://token-icons.s3.amazonaws.com",
               "font-src 'self' data: https://fonts.gstatic.com",

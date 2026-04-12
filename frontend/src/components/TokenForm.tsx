@@ -3,7 +3,7 @@
  */
 "use client";
 
-import { useState } from "react";
+import { useState, useId, cloneElement, isValidElement } from "react";
 import {
   TokenFlavor,
   TOKEN_FLAVOR_LABELS,
@@ -290,7 +290,7 @@ export function TokenForm({
 
             <div>
               <div className="mb-1 flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-200">
+                <label htmlFor="tf-description" className="text-sm font-medium text-gray-200">
                   Description <span className="font-normal text-gray-500">(optional — auto-fills IPFS tab)</span>
                 </label>
                 <button
@@ -308,6 +308,7 @@ export function TokenForm({
                 </button>
               </div>
               <textarea
+                id="tf-description"
                 value={form.description}
                 onChange={(e) => set("description", e.target.value)}
                 rows={2}
@@ -518,16 +519,26 @@ function Field({
   hint?: string;
   required?: boolean;
   className?: string;
+  /** Must be exactly one form element (<input> or <textarea>). */
   children: React.ReactNode;
 }) {
+  const generatedId = useId();
+  // Preserve an existing `id` on the child; fall back to the generated one.
+  const childId =
+    isValidElement<{ id?: string }>(children) && children.props.id
+      ? children.props.id
+      : generatedId;
+
   return (
     <div className={className}>
-      <label className="mb-1 block text-sm font-medium text-gray-200">
+      <label htmlFor={childId} className="mb-1 block text-sm font-medium text-gray-200">
         {label}
         {required && <span className="ml-1 text-red-400">*</span>}
         {hint && <span className="ml-2 text-xs text-gray-500">({hint})</span>}
       </label>
-      {children}
+      {isValidElement<{ id?: string }>(children)
+        ? cloneElement(children, { id: childId })
+        : children}
     </div>
   );
 }

@@ -268,6 +268,7 @@ export function VerifyPanel() {
         {inputMode === "address" ? (
           <div className="space-y-2">
             <input
+              id="verify-contract-addr"
               type="text"
               value={contractAddr}
               onChange={(e) => {
@@ -276,6 +277,7 @@ export function VerifyPanel() {
                 setIsVerified(false);
               }}
               placeholder="0x… contract address"
+              aria-label="Contract address to verify"
               className="w-full rounded-xl border border-dark-border bg-dark-muted px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-brand-500/50 focus:outline-none font-mono"
             />
             {contractAddr && !isValidAddr && (
