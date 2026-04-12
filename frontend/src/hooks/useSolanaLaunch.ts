@@ -59,7 +59,9 @@ export interface WormholeVAA {
   emitterChain: number;
   emitterAddr:  string;
   /** hex-encoded full VAA bytes */
-  vaaBytes:     string;
+  vaaBytes:     `0x${string}`;
+  /** decoded Wormhole payload used by the trusted-relayer path */
+  payloadBytes: `0x${string}`;
   txHash:       string;
 }
 
@@ -143,30 +145,38 @@ export function useSolanaLaunch() {
           `\nSolana tx: ${signature}`
         );
 
-        // ── Step 2: Wait for Wormhole VAA ────────────────────────────────────
+        // ── Step 2: Wait for Wormhole VAA / relayer payload ─────────────────
         setState((s) => ({ ...s, step: "waiting_for_vaa" }));
-        const vaas = await pollForVAAs(signature, params.targetChainIds, params.isTestnet);
+        const vaas = await pollForVAAs(signature, params, params.isTestnet);
         setState((s) => ({ ...s, vaas }));
 
-        // ── Step 3: Submit VAA to EVM chains ─────────────────────────────────
+        // ── Step 3: Relay the decoded bridge payload to each selected chain ──
         setState((s) => ({ ...s, step: "submitting_vaa" }));
         const evmResults: { chainName: string; txHash: string }[] = [];
 
-        for (const vaa of vaas) {
-          const target = CROSS_CHAIN_TARGETS.find(
-            (t) =>
-              t.wormholeChainId === vaa.emitterChain &&
-              t.isTestnet === params.isTestnet
-          );
-          if (!target || !target.receiverAddress) {
-            console.warn(`[useSolanaLaunch] No EVM target for Wormhole chain ${vaa.emitterChain}; skipping`);
-            continue;
-          }
+        const selectedTargets = params.targetChainIds
+          .map((chainId) =>
+            CROSS_CHAIN_TARGETS.find(
+              (t) => t.wormholeChainId === chainId && t.isTestnet === params.isTestnet
+            )
+          )
+          .filter((target): target is CrossChainTarget => Boolean(target?.receiverAddress));
+
+        if (selectedTargets.length === 0) {
+          throw new Error("No configured BurnBridgeReceiver contracts were found for the selected chains.");
+        }
+
+        const bridgeProof = vaas[0];
+        if (!bridgeProof) {
+          throw new Error("No Wormhole proof was returned for this burn transaction.");
+        }
+
+        for (const target of selectedTargets) {
           try {
-            const evmTxHash = await submitVAAToEVM(vaa, target);
+            const evmTxHash = await submitVAAToEVM(bridgeProof, target);
             evmResults.push({ chainName: target.name, txHash: evmTxHash });
           } catch (err) {
-            console.error(`[useSolanaLaunch] Failed to relay VAA to ${target.name}:`, err);
+            console.error(`[useSolanaLaunch] Failed to relay burn proof to ${target.name}:`, err);
             evmResults.push({ chainName: target.name, txHash: "" });
           }
         }
@@ -314,16 +324,81 @@ interface WormholeApiResponse {
   data?: WormholeApiVaaRecord[];
 }
 
+function normalizeVaaBytes(raw: string): `0x${string}` {
+  const trimmed = raw.trim();
+  if (!trimmed) throw new Error("Empty VAA payload");
+
+  if (trimmed.startsWith("0x")) {
+    return trimmed as `0x${string}`;
+  }
+
+  if (/^[0-9a-fA-F]+$/.test(trimmed) && trimmed.length % 2 === 0) {
+    return `0x${trimmed}` as `0x${string}`;
+  }
+
+  return `0x${Buffer.from(trimmed, "base64").toString("hex")}` as `0x${string}`;
+}
+
+function parseVaaEnvelope(vaaBytes: `0x${string}`): Pick<WormholeVAA, "sequence" | "emitterChain" | "emitterAddr" | "payloadBytes"> {
+  const buffer = Buffer.from(vaaBytes.slice(2), "hex");
+  const signatureCount = buffer[5] ?? 0;
+  const bodyOffset = 6 + signatureCount * 66;
+
+  if (buffer.length < bodyOffset + 51) {
+    throw new Error("VAA body is too short to decode.");
+  }
+
+  const body = buffer.subarray(bodyOffset);
+  const emitterChain = body.readUInt16BE(8);
+  const emitterAddr = body.subarray(10, 42).toString("hex");
+  const sequence = body.readBigUInt64BE(42).toString();
+  const payloadBytes = `0x${body.subarray(51).toString("hex")}` as `0x${string}`;
+
+  return {
+    sequence,
+    emitterChain,
+    emitterAddr,
+    payloadBytes,
+  };
+}
+
+function buildSimulatedPayload(
+  txHash: string,
+  params: Pick<SolanaLaunchParams, "targetChainIds" | "evmRecipient" | "burnAmount" | "tokenDecimals" | "tokenMint">
+): `0x${string}` {
+  const payload = Buffer.alloc(114, 0);
+
+  try {
+    new PublicKey(params.tokenMint).toBuffer().copy(payload, 0, 0, 32);
+  } catch {
+    // keep zeroed mint bytes for local simulation
+  }
+
+  Buffer.from(params.evmRecipient.replace(/^0x/i, "").padStart(40, "0"), "hex").copy(payload, 64);
+
+  const decimals = params.tokenDecimals ?? 9;
+  const rawAmount = BigInt(Math.max(1, Math.floor(params.burnAmount * 10 ** decimals)));
+  payload.writeBigUInt64BE(rawAmount, 96);
+
+  const targetChainId = params.targetChainIds.length === 1 ? params.targetChainIds[0] : 0;
+  payload.writeUInt16BE(targetChainId, 104);
+
+  const numericTail = BigInt(parseInt(txHash.slice(0, 12), 16) || Date.now());
+  payload.writeBigUInt64BE(numericTail, 106);
+
+  return `0x${payload.toString("hex")}` as `0x${string}`;
+}
+
 /**
  * Poll Wormhole Scan API for VAA(s) produced by a Solana tx.
- * Falls back to simulated VAAs after timeout (development only).
+ * Falls back to a simulated relay payload after timeout (development only).
  */
 async function pollForVAAs(
-  txHash:         string,
-  targetChainIds: number[],
-  isTestnet:      boolean,
-  maxRetries =    30,
-  delayMs =       4_000
+  txHash:      string,
+  params:      Pick<SolanaLaunchParams, "targetChainIds" | "evmRecipient" | "burnAmount" | "tokenDecimals" | "tokenMint">,
+  isTestnet:   boolean,
+  maxRetries = 30,
+  delayMs =    4_000
 ): Promise<WormholeVAA[]> {
   const apiBase = isTestnet ? WORMHOLE_API.testnet : WORMHOLE_API.mainnet;
 
@@ -334,13 +409,15 @@ async function pollForVAAs(
       if (res.ok) {
         const data = await res.json() as WormholeApiResponse;
         if (data?.data && data.data.length > 0) {
-          return data.data.map((v) => ({
-            sequence:     String(v.sequence),
-            emitterChain: v.emitterChain,
-            emitterAddr:  v.emitterAddr,
-            vaaBytes:     v.vaa,
-            txHash,
-          }));
+          return data.data.map((v) => {
+            const vaaBytes = normalizeVaaBytes(v.vaa);
+            const parsed = parseVaaEnvelope(vaaBytes);
+            return {
+              ...parsed,
+              vaaBytes,
+              txHash,
+            };
+          });
         }
       }
     } catch {
@@ -351,19 +428,22 @@ async function pollForVAAs(
     }
   }
 
-  // Simulation fallback — keeps UI functional during local dev
-  console.warn("[useSolanaLaunch] Wormhole VAA polling timed out — using simulated VAA");
-  return targetChainIds.map((chainId) => ({
-    sequence:     String(Date.now()),
-    emitterChain: chainId,
-    emitterAddr:  "0000000000000000000000000000000000000000000000000000000000000001",
-    vaaBytes:     "0x" + "ab".repeat(100),
-    txHash,
-  }));
+  // Simulation fallback — keeps UI functional during local dev / no-op mode
+  console.warn("[useSolanaLaunch] Wormhole VAA polling timed out — using simulated relayer payload");
+  return [
+    {
+      sequence:     String(Date.now()),
+      emitterChain: 1,
+      emitterAddr:  "0000000000000000000000000000000000000000000000000000000000000001",
+      vaaBytes:     `0x${"ab".repeat(100)}` as `0x${string}`,
+      payloadBytes: buildSimulatedPayload(txHash, params),
+      txHash,
+    },
+  ];
 }
 
 /**
- * Submit a VAA (or relayed payload) to BurnBridgeReceiver on the target EVM chain.
+ * Submit the decoded bridge payload to BurnBridgeReceiver on the target EVM chain.
  * Uses window.ethereum (MetaMask / RainbowKit injected wallet) via viem.
  */
 async function submitVAAToEVM(
@@ -378,32 +458,39 @@ async function submitVAAToEVM(
 
   // Build the message key for replay prevention:
   // keccak256(abi.encodePacked(emitterChain, emitterAddress, sequence))
-  const emitterAddrPadded = ("0x" + vaa.emitterAddr.padStart(64, "0")) as `0x${string}`;
+  const emitterAddrPadded = (`0x${vaa.emitterAddr.padStart(64, "0")}`) as `0x${string}`;
   const messageKey = keccak256(
     encodeAbiParameters(
       [{ type: "uint16" }, { type: "bytes32" }, { type: "uint64" }],
-      [1, emitterAddrPadded, BigInt(vaa.sequence)]
+      [vaa.emitterChain, emitterAddrPadded, BigInt(vaa.sequence)]
     )
   );
-
-  const payload: `0x${string}` = vaa.vaaBytes.startsWith("0x")
-    ? (vaa.vaaBytes as `0x${string}`)
-    : `0x${vaa.vaaBytes}`;
 
   const walletClient = createWalletClient({
     transport: custom((window as Window & { ethereum: unknown }).ethereum),
   });
   const [account] = await walletClient.getAddresses();
 
-  const txHash = await walletClient.writeContract({
-    account,
-    address:      receiverAddress,
-    abi:          BURN_BRIDGE_RECEIVER_ABI,
-    functionName: "receiveRelayedMessage",
-    args:         [payload, messageKey],
-    chain:        null,
-  });
+  try {
+    const txHash = await walletClient.writeContract({
+      account,
+      address:      receiverAddress,
+      abi:          BURN_BRIDGE_RECEIVER_ABI,
+      functionName: "receiveRelayedMessage",
+      args:         [vaa.payloadBytes, messageKey],
+      chain:        null,
+    });
 
-  console.log(`[useSolanaLaunch] VAA relayed to ${target.name}: ${txHash}`);
-  return txHash;
+    console.log(`[useSolanaLaunch] Bridge payload relayed to ${target.name}: ${txHash}`);
+    return txHash;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/trusted relayer/i.test(message)) {
+      throw new Error(
+        `${target.name} rejected the submission because this wallet is not an approved relayer. ` +
+        `Add it via setTrustedRelayer(...) or route through your backend relayer service.`
+      );
+    }
+    throw error;
+  }
 }

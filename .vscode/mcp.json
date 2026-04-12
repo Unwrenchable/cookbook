@@ -1,0 +1,84 @@
+{
+	"servers": {
+		"io.github.ChromeDevTools/chrome-devtools-mcp": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"--registry",
+				"https://registry.npmjs.org",
+				"chrome-devtools-mcp@0.21.0"
+			],
+			"gallery": "https://api.mcp.github.com",
+			"version": "0.21.0"
+		},
+		"io.github.github/github-mcp-server": {
+			"type": "stdio",
+			"command": "docker",
+			"args": [
+				"run",
+				"-i",
+				"--rm",
+				"-e",
+				"GITHUB_PERSONAL_ACCESS_TOKEN=${input:token}",
+				"ghcr.io/github/github-mcp-server:0.33.0"
+			],
+			"gallery": "https://api.mcp.github.com",
+			"version": "0.33.0"
+		},
+		"io.github.vercel/next-devtools-mcp": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"next-devtools-mcp@0.3.6"
+			],
+			"gallery": "https://api.mcp.github.com",
+			"version": "0.3.6"
+		},
+		"huggingface/hf-mcp-server": {
+			"type": "http",
+			"url": "https://huggingface.co/mcp?login",
+			"gallery": "https://api.mcp.github.com",
+			"version": "1.0.0"
+		},
+		"com.vercel/vercel-mcp": {
+			"type": "http",
+			"url": "https://mcp.vercel.com",
+			"gallery": "https://api.mcp.github.com",
+			"version": "0.0.3"
+		},
+		"microsoft/markitdown": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"markitdown-mcp@0.0.1a4"
+			],
+			"gallery": "https://api.mcp.github.com",
+			"version": "1.0.0"
+		},
+		"microsoft/clarity-mcp-server": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"@microsoft/clarity-mcp-server@latest",
+				"--clarity_api_token",
+				"${input:clarity_api_token}"
+			],
+			"gallery": "https://api.mcp.github.com",
+			"version": "1.0.0"
+		}
+	},
+	"inputs": [
+		{
+			"id": "token",
+			"type": "promptString",
+			"description": "",
+			"password": true
+		},
+		{
+			"id": "clarity_api_token",
+			"type": "promptString",
+			"description": "Microsoft Clarity Data Export API token (generate in Clarity: Settings → Data Export).",
+			"password": true
+		}
+	]
+}

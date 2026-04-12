@@ -19,6 +19,7 @@ import {
   TESTNET_TARGETS,
   MAINNET_TARGETS,
 } from "@/lib/crossChain";
+import { TOKEN_BURN_BRIDGE_PROGRAM_ID } from "@/lib/solanaIdl";
 import { useSolanaLaunch } from "@/hooks/useSolanaLaunch";
 
 interface Props {
@@ -34,12 +35,15 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
   const [evmRecipient,   setEvmRecipient]   = useState("");
   const [selectedChains, setSelectedChains] = useState<number[]>([]);
 
-  const tier             = getBurnTier(burnAmount);
-  const maxChainsAllowed = tier
+  const armedTargets      = targets.filter((t) => Boolean(t.receiverAddress));
+  const tier              = getBurnTier(burnAmount);
+  const maxChainsAllowed  = tier
     ? tier.chainsActivated === Infinity
       ? targets.length
       : tier.chainsActivated
     : 0;
+  const hasRealProgramId  = TOKEN_BURN_BRIDGE_PROGRAM_ID !== "11111111111111111111111111111111";
+  const bridgeIsArmed     = hasRealProgramId && armedTargets.length > 0;
 
   function toggleChain(chainId: number) {
     setSelectedChains((prev) => {
@@ -149,9 +153,42 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
         <p className="font-semibold text-base mb-1 text-blue-200">🌉 Solana-First Cross-Chain Launch</p>
         <p>
           Burn SPL tokens on Solana to <strong className="text-blue-200">activate</strong> ERC20 minting on EVM chains.
-          Wormhole relays the burn proof — no trusted intermediary.
+          Wormhole carries the proof, and today&apos;s UI uses the trusted-relayer path while the direct VAA receiver is being hardened.
           More you burn, more chains you unlock.
         </p>
+      </div>
+
+      {/* ─── Bridge readiness ─────────────────────────────────────────── */}
+      <div className={`rounded-xl border p-4 text-sm ${
+        bridgeIsArmed
+          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+          : "border-yellow-500/30 bg-yellow-500/10 text-yellow-300"
+      }`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <p className="font-semibold text-base">
+              {bridgeIsArmed ? "✅ Bridge route armed" : "⚠️ Bridge still needs setup"}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-inherit/90">
+              {!hasRealProgramId
+                ? "The Solana program ID is still the placeholder value. Deploy the Anchor program and set NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID before using mainnet burns."
+                : armedTargets.length === 0
+                ? "No EVM receiver contracts are configured for the selected environment yet. Add the NEXT_PUBLIC_RECEIVER_* envs to enable chain activation."
+                : "The route is configured, but EVM minting still uses the trusted-relayer beta path until full Wormhole receiveMessage() verification is enabled."}
+            </p>
+          </div>
+          <div className="rounded-lg border border-current/20 bg-black/10 px-3 py-2 text-[11px] font-mono break-all">
+            {TOKEN_BURN_BRIDGE_PROGRAM_ID.slice(0, 6)}…{TOKEN_BURN_BRIDGE_PROGRAM_ID.slice(-6)}
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+          <div className="rounded-lg border border-current/15 bg-black/10 px-3 py-2">
+            <span className="font-semibold">Live receivers:</span> {armedTargets.length}/{targets.length}
+          </div>
+          <div className="rounded-lg border border-current/15 bg-black/10 px-3 py-2">
+            <span className="font-semibold">Mode:</span> {bridgeIsArmed ? "Trusted-relayer beta" : "Configuration pending"}
+          </div>
+        </div>
       </div>
 
       {/* ─── SPL token mint ────────────────────────────────────────────── */}
@@ -229,14 +266,15 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {targets.map((t) => {
             const isSelected = selectedChains.includes(t.wormholeChainId);
-            const isDisabled = !isSelected && selectedChains.length >= maxChainsAllowed;
+            const isUnavailable = !t.receiverAddress;
+            const isDisabled = isUnavailable || (!isSelected && selectedChains.length >= maxChainsAllowed);
             return (
               <button
                 key={t.evmChainId}
                 type="button"
                 disabled={isDisabled}
                 onClick={() => toggleChain(t.wormholeChainId)}
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                   isSelected
                     ? "border-orange-500/60 bg-orange-500/15 text-orange-300 font-medium"
                     : isDisabled
@@ -244,8 +282,15 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
                     : "border-dark-border bg-dark-muted text-gray-400 hover:border-orange-500/40 hover:text-gray-200"
                 }`}
               >
-                {isSelected && <span>🔥</span>}
-                {t.name}
+                <span className="flex items-center gap-2">
+                  {isSelected && <span>🔥</span>}
+                  {t.name}
+                </span>
+                {isUnavailable && (
+                  <span className="rounded-full border border-dark-border px-2 py-0.5 text-[10px] text-gray-500">
+                    Soon
+                  </span>
+                )}
               </button>
             );
           })}
