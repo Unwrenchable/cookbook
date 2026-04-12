@@ -53,7 +53,8 @@ const nextConfig = {
                 " https://api.wormholescan.io" +       // Wormhole VAA API
                 " https://api.pinata.cloud" +          // Pinata IPFS upload
                 " https://bsc-dataseed.binance.org" +  // BSC public RPC
-                " https://api.avax.network",           // Avalanche public RPC
+                " https://api.avax.network" +          // Avalanche public RPC
+                " https://api.web3modal.org",          // WalletConnect/AppKit remote config
               "frame-src 'none'",
               "object-src 'none'",
               "base-uri 'self'",

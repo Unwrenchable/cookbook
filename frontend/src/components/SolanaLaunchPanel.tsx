@@ -62,31 +62,31 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
 
   if (state.step === "complete") {
     return (
-      <div className="rounded-2xl border border-brand-200 bg-brand-50 p-6 space-y-4">
+      <div className="rounded-2xl border border-brand-500/30 bg-brand-500/10 p-6 space-y-4">
         <div className="flex items-center gap-3">
           <span className="text-3xl">🔥</span>
           <div>
-            <h3 className="text-lg font-bold text-brand-900">Chains Activated!</h3>
-            <p className="text-sm text-brand-700">
+            <h3 className="text-lg font-bold text-brand-300">Chains Activated!</h3>
+            <p className="text-sm text-brand-400">
               Your Solana burn activated tokens on {selectedChains.length} EVM chain(s).
             </p>
           </div>
         </div>
         {state.txHash && (
-          <div className="text-xs font-mono text-gray-600 break-all">
+          <div className="text-xs font-mono text-gray-400 break-all">
             Solana Tx: {state.txHash}
           </div>
         )}
         <ul className="space-y-1 text-sm">
           {state.evmResults.length > 0
             ? state.evmResults.map((r) => (
-                <li key={r.chainName} className="flex items-center gap-2 text-gray-700">
-                  <span className={r.txHash ? "text-green-500" : "text-red-400"}>
+                <li key={r.chainName} className="flex items-center gap-2 text-gray-300">
+                  <span className={r.txHash ? "text-green-400" : "text-red-400"}>
                     {r.txHash ? "✓" : "✗"}
                   </span>
                   {r.chainName}
                   {r.txHash && (
-                    <span className="text-xs font-mono text-gray-400 truncate">
+                    <span className="text-xs font-mono text-gray-500 truncate">
                       {r.txHash.slice(0, 10)}…
                     </span>
                   )}
@@ -95,8 +95,8 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
             : selectedChains.map((chainId) => {
                 const t = targets.find((x) => x.wormholeChainId === chainId);
                 return t ? (
-                  <li key={chainId} className="flex items-center gap-2 text-gray-700">
-                    <span className="text-green-500">✓</span> {t.name}
+                  <li key={chainId} className="flex items-center gap-2 text-gray-300">
+                    <span className="text-green-400">✓</span> {t.name}
                   </li>
                 ) : null;
               })}
@@ -104,7 +104,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
         <button
           type="button"
           onClick={reset}
-          className="w-full rounded-xl border border-gray-300 bg-white px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          className="w-full rounded-xl border border-dark-border bg-dark-muted px-6 py-2 text-sm font-medium text-gray-200 hover:bg-dark-card transition-colors"
         >
           Burn again
         </button>
@@ -116,36 +116,39 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
     <form onSubmit={handleSubmit} className="space-y-6">
 
       {/* ─── Wallet connect ─────────────────────────────────────────────── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-purple-200 bg-purple-50 p-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 rounded-xl border border-purple-500/30 bg-purple-500/10 p-4">
         <div>
-          <p className="font-semibold text-purple-900 text-sm">Solana Wallet</p>
+          <p className="font-semibold text-purple-300 text-sm">Solana Wallet</p>
           {connected && publicKey ? (
-            <p className="text-xs font-mono text-purple-700 break-all mt-0.5">
+            <p className="text-xs font-mono text-purple-400 break-all mt-0.5">
               {publicKey.toBase58().slice(0, 4)}…{publicKey.toBase58().slice(-4)}
             </p>
           ) : (
-            <p className="text-xs text-purple-600 mt-0.5">
+            <p className="text-xs text-purple-400 mt-0.5">
               Phantom · Solflare · Coinbase Wallet
             </p>
           )}
         </div>
         <WalletMultiButton
           style={{
-            background: "#7c3aed",
+            background:   connected ? "rgba(163,230,53,0.1)"  : "rgba(124,58,237,0.2)",
+            border:       `1px solid ${connected ? "rgba(163,230,53,0.35)" : "rgba(124,58,237,0.5)"}`,
             borderRadius: "0.75rem",
-            fontSize: "0.875rem",
-            fontWeight: 600,
-            padding: "0.5rem 1.25rem",
-            height: "auto",
+            color:        connected ? "#a3e635" : "#c4b5fd",
+            fontSize:     "0.875rem",
+            fontWeight:   600,
+            padding:      "0.5rem 1.25rem",
+            height:       "auto",
+            whiteSpace:   "nowrap",
           }}
         />
       </div>
 
       {/* ─── Explainer ─────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-        <p className="font-semibold text-base mb-1">🌉 Solana-First Cross-Chain Launch</p>
-        <p className="text-blue-700">
-          Burn SPL tokens on Solana to <strong>activate</strong> ERC20 minting on EVM chains.
+      <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 p-4 text-sm text-blue-300">
+        <p className="font-semibold text-base mb-1 text-blue-200">🌉 Solana-First Cross-Chain Launch</p>
+        <p>
+          Burn SPL tokens on Solana to <strong className="text-blue-200">activate</strong> ERC20 minting on EVM chains.
           Wormhole relays the burn proof — no trusted intermediary.
           More you burn, more chains you unlock.
         </p>
@@ -153,25 +156,25 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
 
       {/* ─── SPL token mint ────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-300 mb-1">
           SPL Token Mint Address
-          <span className="ml-2 text-xs text-gray-400">(the token you want to burn)</span>
+          <span className="ml-2 text-xs text-gray-500">(the token you want to burn)</span>
         </label>
         <input
           type="text"
           value={tokenMint}
           onChange={(e) => setTokenMint(e.target.value.trim())}
           placeholder="So1anaM1ntAddressXXXXXXXXXXXXXXXXXXXXXXXX"
-          className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="block w-full rounded-lg border border-dark-border bg-dark-muted px-3 py-2 text-sm font-mono text-gray-200 placeholder:text-gray-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />
       </div>
 
       {/* ─── Burn tiers ────────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
+        <label className="block text-sm font-semibold text-gray-300 mb-2">
           Burn Tier
         </label>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {BURN_TIERS.map((t) => (
             <button
               key={t.label}
@@ -179,8 +182,8 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
               onClick={() => setBurnAmount(t.minBurn)}
               className={`rounded-xl border p-3 text-left text-sm transition-colors ${
                 tier?.label === t.label
-                  ? "border-brand-500 bg-brand-50 text-brand-700"
-                  : "border-gray-200 bg-white text-gray-600 hover:border-brand-300"
+                  ? "border-brand-500/60 bg-brand-500/15 text-brand-300"
+                  : "border-dark-border bg-dark-muted text-gray-400 hover:border-brand-500/40 hover:text-gray-200"
               }`}
             >
               <div className="font-bold">{t.label}</div>
@@ -192,10 +195,10 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
 
       {/* ─── Burn amount ───────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-300 mb-1">
           Tokens to Burn
           {tier && (
-            <span className="ml-2 text-xs text-gray-400">
+            <span className="ml-2 text-xs text-gray-500">
               (activates {tier.chainsActivated === Infinity ? "all" : tier.chainsActivated} chain{tier.chainsActivated !== 1 ? "s" : ""})
             </span>
           )}
@@ -206,18 +209,18 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
           onChange={(e) => setBurnAmount(Number(e.target.value))}
           min={100}
           step={100}
-          className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="block w-full rounded-lg border border-dark-border bg-dark-muted px-3 py-2 text-sm text-gray-200 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />
         {!tier && burnAmount > 0 && (
-          <p className="mt-1 text-xs text-red-500">Minimum burn is 100 tokens</p>
+          <p className="mt-1 text-xs text-red-400">Minimum burn is 100 tokens</p>
         )}
       </div>
 
       {/* ─── Target EVM chains ─────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">
+        <label className="block text-sm font-semibold text-gray-300 mb-2">
           Target EVM Chains
-          <span className="ml-2 text-xs font-normal text-gray-400">
+          <span className="ml-2 text-xs font-normal text-gray-500">
             (select up to {maxChainsAllowed})
           </span>
         </label>
@@ -233,13 +236,13 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
                 onClick={() => toggleChain(t.wormholeChainId)}
                 className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                   isSelected
-                    ? "border-orange-400 bg-orange-50 text-orange-700 font-medium"
+                    ? "border-orange-500/60 bg-orange-500/15 text-orange-300 font-medium"
                     : isDisabled
-                    ? "border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed"
-                    : "border-gray-200 bg-white text-gray-600 hover:border-orange-300"
+                    ? "border-dark-border bg-dark-muted/50 text-gray-600 cursor-not-allowed"
+                    : "border-dark-border bg-dark-muted text-gray-400 hover:border-orange-500/40 hover:text-gray-200"
                 }`}
               >
-                {isSelected && <span className="text-orange-500">🔥</span>}
+                {isSelected && <span>🔥</span>}
                 {t.name}
               </button>
             );
@@ -249,32 +252,32 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
 
       {/* ─── EVM Recipient ─────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-gray-300 mb-1">
           EVM Recipient Address
-          <span className="ml-2 text-xs text-gray-400">(receives minted tokens)</span>
+          <span className="ml-2 text-xs text-gray-500">(receives minted tokens)</span>
         </label>
         <input
           type="text"
           value={evmRecipient}
           onChange={(e) => setEvmRecipient(e.target.value)}
           placeholder="0x..."
-          className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+          className="block w-full rounded-lg border border-dark-border bg-dark-muted px-3 py-2 text-sm font-mono text-gray-200 placeholder:text-gray-600 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />
       </div>
 
       {/* ─── Flow diagram ──────────────────────────────────────────────── */}
       {selectedChains.length > 0 && evmRecipient && tokenMint && (
-        <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-600 space-y-1.5">
-          <p className="font-semibold text-gray-700 text-sm">What will happen:</p>
+        <div className="rounded-xl border border-dark-border bg-dark-muted/50 p-4 text-xs text-gray-400 space-y-1.5">
+          <p className="font-semibold text-gray-300 text-sm">What will happen:</p>
           <ol className="list-decimal list-inside space-y-1">
             <li>Wallet signs the Solana burn transaction</li>
-            <li>Anchor program burns <strong>{burnAmount} SPL tokens</strong> from mint{" "}
-              <span className="font-mono">{tokenMint.slice(0, 6)}…{tokenMint.slice(-4)}</span>
+            <li>Anchor program burns <strong className="text-gray-200">{burnAmount} SPL tokens</strong> from mint{" "}
+              <span className="font-mono text-gray-300">{tokenMint.slice(0, 6)}…{tokenMint.slice(-4)}</span>
             </li>
             <li>Wormhole guardians sign the burn VAA (~13 s on mainnet)</li>
             <li>
               ERC20 tokens minted on:{" "}
-              <strong>
+              <strong className="text-gray-200">
                 {selectedChains
                   .map((id) => targets.find((t) => t.wormholeChainId === id)?.name)
                   .filter(Boolean)
@@ -287,7 +290,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
 
       {/* ─── Status ────────────────────────────────────────────────────── */}
       {state.step !== "idle" && state.step !== "error" && (
-        <div className="flex items-center gap-2 text-sm text-gray-600">
+        <div className="flex items-center gap-2 text-sm text-gray-400">
           <span className="animate-spin text-xl">⚙️</span>
           {state.step === "burning"          && "Burning tokens on Solana…"}
           {state.step === "waiting_for_vaa"  && "Waiting for Wormhole VAA (~13 seconds)…"}
@@ -296,7 +299,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
       )}
 
       {state.error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
           {state.error.message}
         </div>
       )}
@@ -314,7 +317,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
         }
         className="w-full rounded-xl bg-orange-500 px-6 py-3 font-semibold text-white shadow hover:bg-orange-600 focus:outline-none focus:ring-2 focus:ring-orange-400 focus:ring-offset-2 disabled:opacity-60 transition-colors"
       >
-        {!connected ? "Connect wallet to continue" : "🔥 Burn & Activate Chains"}
+        {!connected ? "Connect Solana wallet to continue" : "🔥 Burn & Activate Chains"}
       </button>
     </form>
   );
