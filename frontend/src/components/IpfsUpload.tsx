@@ -85,8 +85,10 @@ export function IpfsUpload({ tokenName = "", tokenSymbol = "", onUploaded }: Pro
         </span>
         <input
           ref={fileRef}
+          id="ipfs-logo"
           type="file"
           accept="image/*"
+          aria-label="Token logo image"
           onChange={handleFileChange}
           className="hidden"
         />
@@ -95,18 +97,19 @@ export function IpfsUpload({ tokenName = "", tokenSymbol = "", onUploaded }: Pro
       {/* Metadata fields */}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-400">Token Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="MyToken" className={inputCls} />
+          <label htmlFor="ipfs-name" className="mb-1 block text-xs font-medium text-gray-400">Token Name</label>
+          <input id="ipfs-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="MyToken" className={inputCls} />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-gray-400">Symbol</label>
-          <input value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} placeholder="MTK" className={inputCls} />
+          <label htmlFor="ipfs-symbol" className="mb-1 block text-xs font-medium text-gray-400">Symbol</label>
+          <input id="ipfs-symbol" value={symbol} onChange={(e) => setSymbol(e.target.value.toUpperCase())} placeholder="MTK" className={inputCls} />
         </div>
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-gray-400">Description</label>
+        <label htmlFor="ipfs-description" className="mb-1 block text-xs font-medium text-gray-400">Description</label>
         <textarea
+          id="ipfs-description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={2}

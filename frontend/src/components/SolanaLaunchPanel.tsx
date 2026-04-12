@@ -156,11 +156,12 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
 
       {/* ─── SPL token mint ────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
+        <label htmlFor="sl-token-mint" className="block text-sm font-medium text-gray-300 mb-1">
           SPL Token Mint Address
           <span className="ml-2 text-xs text-gray-500">(the token you want to burn)</span>
         </label>
         <input
+          id="sl-token-mint"
           type="text"
           value={tokenMint}
           onChange={(e) => setTokenMint(e.target.value.trim())}
@@ -195,7 +196,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
 
       {/* ─── Burn amount ───────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
+        <label htmlFor="sl-burn-amount" className="block text-sm font-medium text-gray-300 mb-1">
           Tokens to Burn
           {tier && (
             <span className="ml-2 text-xs text-gray-500">
@@ -204,6 +205,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
           )}
         </label>
         <input
+          id="sl-burn-amount"
           type="number"
           value={burnAmount}
           onChange={(e) => setBurnAmount(Number(e.target.value))}
@@ -252,11 +254,12 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
 
       {/* ─── EVM Recipient ─────────────────────────────────────────────── */}
       <div>
-        <label className="block text-sm font-medium text-gray-300 mb-1">
+        <label htmlFor="sl-evm-recipient" className="block text-sm font-medium text-gray-300 mb-1">
           EVM Recipient Address
           <span className="ml-2 text-xs text-gray-500">(receives minted tokens)</span>
         </label>
         <input
+          id="sl-evm-recipient"
           type="text"
           value={evmRecipient}
           onChange={(e) => setEvmRecipient(e.target.value)}

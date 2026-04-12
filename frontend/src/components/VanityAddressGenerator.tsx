@@ -118,12 +118,13 @@ export function VanityAddressGenerator() {
 
           {/* Prefix */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="vanity-prefix" className="block text-sm font-medium text-gray-700 mb-1">
               Prefix <span className="text-gray-400 text-xs">(after 0x)</span>
             </label>
             <div className="relative">
               <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 font-mono text-sm">0x</span>
               <input
+                id="vanity-prefix"
                 type="text"
                 value={prefix}
                 onChange={(e) => setPrefix(e.target.value.toLowerCase())}
@@ -156,10 +157,11 @@ export function VanityAddressGenerator() {
 
           {/* Suffix */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="vanity-suffix" className="block text-sm font-medium text-gray-700 mb-1">
               Suffix <span className="text-gray-400 text-xs">(end of address)</span>
             </label>
             <input
+              id="vanity-suffix"
               type="text"
               value={suffix}
               onChange={(e) => setSuffix(e.target.value.toLowerCase())}

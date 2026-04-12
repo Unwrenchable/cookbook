@@ -187,8 +187,9 @@ export function LPLockerPanel() {
       {activeSubTab === "new" && (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">LP Token Address</label>
+            <label htmlFor="lp-token-address" className="block text-sm font-medium text-gray-300 mb-1">LP Token Address</label>
             <input
+              id="lp-token-address"
               type="text"
               value={lpToken}
               onChange={(e) => setLpToken(e.target.value)}
@@ -203,9 +204,10 @@ export function LPLockerPanel() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-1">Amount to Lock</label>
+            <label htmlFor="lp-amount" className="block text-sm font-medium text-gray-300 mb-1">Amount to Lock</label>
             <div className="flex gap-2">
               <input
+                id="lp-amount"
                 type="number"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
