@@ -32,7 +32,7 @@ use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount};
 /// Program ID placeholder — replace with the output of `anchor build` / `solana-keygen new`.
 /// Run: `solana-keygen new --outfile target/deploy/token_burn_bridge-keypair.json`
 /// then: `anchor build` and copy the program ID from the output.
-declare_id!("11111111111111111111111111111111");
+declare_id!("2sAka7jCkP71LbKk1MpELxFpjSHjScQk1aStrDt4Pnnf");
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -41,12 +41,6 @@ const BRIDGE_CONFIG_SEEDS: &[u8] = b"bridge-config";
 
 /// Seed for per-user nonce tracking (replay prevention)
 const USER_NONCE_SEEDS: &[u8] = b"user-nonce";
-
-/// Wormhole Core Bridge program ID on Solana mainnet.
-/// Devnet uses the same address. Update if Wormhole changes.
-const WORMHOLE_PROGRAM_ID: Pubkey = anchor_lang::solana_program::pubkey!(
-    "worm2ZoG2kUd4vFXhvjh93UUH596ayRfgQ2MgjNMTth"
-);
 
 /// Minimum burn to activate one EVM chain (in raw token units with 9 decimals)
 pub const MIN_BURN_ONE_CHAIN:   u64 = 100  * 1_000_000_000;

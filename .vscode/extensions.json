@@ -1,5 +1,6 @@
 {
     "recommendations": [
-        "ms-vscode.remote-explorer"
+        "ms-vscode.remote-explorer",
+        "solana-developers.solana-vs-code-extension-pack"
     ]
 }

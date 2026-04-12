@@ -1,0 +1,473 @@
+{
+  "address": "2sAka7jCkP71LbKk1MpELxFpjSHjScQk1aStrDt4Pnnf",
+  "metadata": {
+    "name": "token_burn_bridge",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "TokenForge cross-chain burn-to-activate bridge (Solana side)"
+  },
+  "instructions": [
+    {
+      "name": "burn_and_bridge",
+      "docs": [
+        "Burns SPL tokens and emits a Wormhole cross-chain message to activate",
+        "ERC20 minting on one or more EVM chains.",
+        "",
+        "`amount`            – raw token units to burn (includes decimals)",
+        "`target_chain_id`   – Wormhole chain ID of the target EVM chain (0 = all)",
+        "`evm_recipient`     – 20-byte EVM address of the token recipient",
+        "`consistency_level` – Wormhole finality (1 = confirmed, 32 = finalized)"
+      ],
+      "discriminator": [
+        187,
+        9,
+        252,
+        183,
+        112,
+        230,
+        84,
+        14
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  114,
+                  105,
+                  100,
+                  103,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint",
+          "writable": true
+        },
+        {
+          "name": "user_token_account",
+          "writable": true
+        },
+        {
+          "name": "user_nonce",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  117,
+                  115,
+                  101,
+                  114,
+                  45,
+                  110,
+                  111,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "user"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        },
+        {
+          "name": "target_chain_id",
+          "type": "u16"
+        },
+        {
+          "name": "evm_recipient",
+          "type": {
+            "array": [
+              "u8",
+              20
+            ]
+          }
+        },
+        {
+          "name": "consistency_level",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "initialize",
+      "docs": [
+        "Called once by the deployer to configure the bridge."
+      ],
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  114,
+                  105,
+                  100,
+                  103,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "evm_receiver_addresses",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "EvmChainReceiver"
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "update_receivers",
+      "docs": [
+        "Update the list of EVM chain receivers (only authority)."
+      ],
+      "discriminator": [
+        93,
+        113,
+        76,
+        123,
+        168,
+        158,
+        158,
+        229
+      ],
+      "accounts": [
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  114,
+                  105,
+                  100,
+                  103,
+                  101,
+                  45,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "evm_receivers",
+          "type": {
+            "vec": {
+              "defined": {
+                "name": "EvmChainReceiver"
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "BridgeConfig",
+      "discriminator": [
+        40,
+        206,
+        51,
+        233,
+        246,
+        40,
+        178,
+        85
+      ]
+    },
+    {
+      "name": "UserNonce",
+      "discriminator": [
+        235,
+        133,
+        1,
+        243,
+        18,
+        135,
+        88,
+        224
+      ]
+    }
+  ],
+  "events": [
+    {
+      "name": "BurnMessageEmitted",
+      "discriminator": [
+        31,
+        132,
+        141,
+        109,
+        6,
+        47,
+        154,
+        84
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "BurnTooSmall",
+      "msg": "Burn amount too small. Minimum is 100 tokens to activate 1 chain."
+    },
+    {
+      "code": 6001,
+      "name": "InsufficientBalance",
+      "msg": "Insufficient token balance."
+    },
+    {
+      "code": 6002,
+      "name": "UnsupportedChain",
+      "msg": "Target chain not supported. Add it via update_receivers."
+    },
+    {
+      "code": 6003,
+      "name": "WrongMint",
+      "msg": "Token mint does not match bridge config."
+    },
+    {
+      "code": 6004,
+      "name": "WrongOwner",
+      "msg": "Token account owner does not match signer."
+    },
+    {
+      "code": 6005,
+      "name": "Unauthorized",
+      "msg": "Unauthorized: only the bridge authority can call this."
+    },
+    {
+      "code": 6006,
+      "name": "TooManyReceivers",
+      "msg": "Too many EVM receivers. Maximum is 10."
+    }
+  ],
+  "types": [
+    {
+      "name": "BridgeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "evm_receivers",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "EvmChainReceiver"
+                }
+              }
+            }
+          },
+          {
+            "name": "total_burned",
+            "type": "u64"
+          },
+          {
+            "name": "total_messages_sent",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BurnMessageEmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "sequence",
+            "type": "u64"
+          },
+          {
+            "name": "solana_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "solana_sender",
+            "type": "pubkey"
+          },
+          {
+            "name": "evm_recipient",
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "amount_burned",
+            "type": "u64"
+          },
+          {
+            "name": "target_chain_id",
+            "type": "u16"
+          },
+          {
+            "name": "payload_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "consistency_level",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "EvmChainReceiver",
+      "docs": [
+        "Maps a Wormhole chain ID to the deployed BurnBridgeReceiver address on that chain"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "chain_id",
+            "type": "u16"
+          },
+          {
+            "name": "receiver_address",
+            "type": {
+              "array": [
+                "u8",
+                20
+              ]
+            }
+          },
+          {
+            "name": "is_active",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "UserNonce",
+      "docs": [
+        "Per-user nonce counter for Wormhole replay protection"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nonce",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ]
+}

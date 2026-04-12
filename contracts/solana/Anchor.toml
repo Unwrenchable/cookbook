@@ -3,10 +3,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-token_burn_bridge = "11111111111111111111111111111111"
+token_burn_bridge = "2sAka7jCkP71LbKk1MpELxFpjSHjScQk1aStrDt4Pnnf"
 
 [programs.devnet]
-token_burn_bridge = "11111111111111111111111111111111"
+token_burn_bridge = "2sAka7jCkP71LbKk1MpELxFpjSHjScQk1aStrDt4Pnnf"
 
 [registry]
 url = "https://api.apr.dev"

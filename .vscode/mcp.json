@@ -1,16 +1,19 @@
 {
-	"servers": {
-		"io.github.ChromeDevTools/chrome-devtools-mcp": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"--registry",
-				"https://registry.npmjs.org",
-				"chrome-devtools-mcp@0.21.0"
-			],
-			"gallery": "https://api.mcp.github.com",
-			"version": "0.21.0"
+	"inputs": [
+		{
+			"id": "token",
+			"type": "promptString",
+			"description": "",
+			"password": true
 		},
+		{
+			"id": "clarity_api_token",
+			"type": "promptString",
+			"description": "Microsoft Clarity Data Export API token (generate in Clarity: Settings → Data Export).",
+			"password": true
+		}
+	],
+	"servers": {
 		"io.github.github/github-mcp-server": {
 			"type": "stdio",
 			"command": "docker",
@@ -54,31 +57,6 @@
 			],
 			"gallery": "https://api.mcp.github.com",
 			"version": "1.0.0"
-		},
-		"microsoft/clarity-mcp-server": {
-			"type": "stdio",
-			"command": "npx",
-			"args": [
-				"@microsoft/clarity-mcp-server@latest",
-				"--clarity_api_token",
-				"${input:clarity_api_token}"
-			],
-			"gallery": "https://api.mcp.github.com",
-			"version": "1.0.0"
 		}
-	},
-	"inputs": [
-		{
-			"id": "token",
-			"type": "promptString",
-			"description": "",
-			"password": true
-		},
-		{
-			"id": "clarity_api_token",
-			"type": "promptString",
-			"description": "Microsoft Clarity Data Export API token (generate in Clarity: Settings → Data Export).",
-			"password": true
-		}
-	]
+	}
 }

@@ -14,8 +14,8 @@
  */
 
 import * as anchor from "@coral-xyz/anchor";
-import { Program, BN }     from "@coral-xyz/anchor";
-import { TokenBurnBridge }  from "../target/types/token_burn_bridge";
+import type { TokenBurnBridge }  from "../target/types/token_burn_bridge.ts";
+import BN from "bn.js";
 import {
   Keypair,
   PublicKey,
@@ -75,7 +75,7 @@ describe("token-burn-bridge", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const program = anchor.workspace.TokenBurnBridge as Program<TokenBurnBridge>;
+  const program = anchor.workspace.TokenBurnBridge as anchor.Program<TokenBurnBridge>;
   const connection = provider.connection;
 
   // Keypairs
@@ -159,27 +159,6 @@ describe("token-burn-bridge", () => {
   // ─── Initialize ────────────────────────────────────────────────────────────
 
   describe("initialize", () => {
-    it("initializes the bridge config with 6 EVM receivers", async () => {
-      await program.methods
-        .initialize(defaultReceivers)
-        .accounts({
-          config:        configPda,
-          tokenMint:     mint,
-          authority:     authority.publicKey,
-          systemProgram: SystemProgram.programId,
-        })
-        .signers([authority])
-        .rpc();
-
-      const config = await program.account.bridgeConfig.fetch(configPda);
-      expect(config.authority.toBase58()).to.equal(authority.publicKey.toBase58());
-      expect(config.tokenMint.toBase58()).to.equal(mint.toBase58());
-      expect(config.evmReceivers).to.have.length(6);
-      expect(config.totalBurned.toNumber()).to.equal(0);
-      expect(config.totalMessagesSent.toNumber()).to.equal(0);
-      expect(config.bump).to.equal(configBump);
-    });
-
     it("rejects initialization with more than 10 receivers", async () => {
       const tooMany = Array.from({ length: 11 }, (_, i) =>
         makeEvmReceiver(i + 1, Array.from({ length: 20 }, () => i))
@@ -212,6 +191,27 @@ describe("token-burn-bridge", () => {
       } catch (err: any) {
         expect(err.error?.errorCode?.code ?? err.toString()).to.include("TooManyReceivers");
       }
+    });
+
+    it("initializes the bridge config with 6 EVM receivers", async () => {
+      await program.methods
+        .initialize(defaultReceivers)
+        .accounts({
+          config:        configPda,
+          tokenMint:     mint,
+          authority:     authority.publicKey,
+          systemProgram: SystemProgram.programId,
+        })
+        .signers([authority])
+        .rpc();
+
+      const config = await program.account.bridgeConfig.fetch(configPda);
+      expect(config.authority.toBase58()).to.equal(authority.publicKey.toBase58());
+      expect(config.tokenMint.toBase58()).to.equal(mint.toBase58());
+      expect(config.evmReceivers).to.have.length(6);
+      expect(config.totalBurned.toNumber()).to.equal(0);
+      expect(config.totalMessagesSent.toNumber()).to.equal(0);
+      expect(config.bump).to.equal(configBump);
     });
   });
 
