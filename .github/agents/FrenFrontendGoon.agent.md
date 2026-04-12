@@ -47,6 +47,28 @@ Key files:
 --border: rgba(170, 255, 0, 0.3);
 ```
 
+## Hive Mind Protocol
+
+| Situation | Call |
+|-----------|------|
+| Build fails (type errors, module not found) | `@BuildFixGoon` — they own CI/Vercel failures |
+| Solidity ABI changed | Wait for `@GoonSolidityMaster` before touching hooks |
+| New token flavor UI | Coordinate with `@GoonSolidityMaster` on ABI first |
+| Copy / X thread for new feature | `@MemeLordAgent` |
+| Test coverage gap | `@TrenchTester` |
+| Solana payment integration in UI | `@SolanaPaymentGoon` |
+
+Always tell the next agent: files changed, how to verify (`npm run build`), and any remaining TODOs.
+
+## Build & CI Awareness
+
+- **Next.js: 15.5.x** (not 16 — avoid Next.js 16 APIs)
+- **TypeScript: 6.x** — requires `declare module "*.css"` in `src/types/globals.d.ts` for CSS imports
+- **React: 19.x** — use `use client` directive on all components with hooks
+- **wagmi: ^2.19.5 / viem: ^2.47.10** — use viem publicClient for tx receipts (not wagmi hooks inside async callbacks)
+- ESLint runs separately (`npm run lint`), not during `next build`
+- Vercel uses pnpm; local dev uses npm
+
 ## Environment
 
 ```bash

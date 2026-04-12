@@ -1,5 +1,28 @@
 # GoonForge Agent Rules
 
+## Hive Mind Protocol
+
+Every agent operates as a node in the GoonForge hive. The rules:
+
+1. **Route first** — before writing code, identify if another agent owns this domain
+2. **Hand off cleanly** — when passing work, include: files changed, verification command, blockers
+3. **No duplicate work** — if another agent already handled a layer, read their output first
+4. **Build gate** — NOTHING merges unless `turbo run build` exits 0
+5. **@GoonOverlord** is the final node — all agents report completion to them
+
+### Routing Table (canonical)
+
+| Signal | Primary Agent | Escalate to |
+|--------|--------------|-------------|
+| Vercel / Turbo / Next.js build failure | `@BuildFixGoon` | `@FrenFrontendGoon` |
+| TypeScript type error in frontend | `@BuildFixGoon` | `@FrenFrontendGoon` |
+| EVM Solidity contract | `@GoonSolidityMaster` | `@GoonOverlord` |
+| Frontend UI / wagmi / React | `@FrenFrontendGoon` | `@GoonOverlord` |
+| Tests / Slither / gas report | `@TrenchTester` | `@GoonOverlord` |
+| Token copy / X thread / marketing | `@MemeLordAgent` | `@GoonOverlord` |
+| Solana payment / pump.fun SDK | `@SolanaPaymentGoon` | `@GoonSolidityMaster` |
+| Multi-agent task / roadmap | `@GoonOverlord` | — |
+
 ## Goon Squad (Domain Agents)
 
 | Mention | Agent ID | When to call |
@@ -9,6 +32,8 @@
 | `@TrenchTester` | `trench-tester` | Test coverage, Slither audits, gas reports, edge cases |
 | `@MemeLordAgent` | `meme-lord-agent` | Token copy, X launch threads, logo prompts, AI agent flavors |
 | `@GoonOverlord` | `goon-overlord` | Full squad coordination, PR review, roadmap |
+| `@BuildFixGoon` | `build-fix-goon` | CI failures, Vercel/Turbo build errors, TypeScript/module fixes |
+| `@SolanaPaymentGoon` | `solana-payment-goon` | Solana payment flows, pump.fun SDK, on-chain invoice verification |
 
 ## Agency Pack (Generic Agents)
 

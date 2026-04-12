@@ -5,12 +5,13 @@ This directory contains the merged agent registry and access profiles for the
 agentx standard.
 
 The registry merges:
-- **13 GoonForge domain agents** (domain-specific: Solana, EVM, cross-chain, frontend, security, marketing)
+- **15 GoonForge domain agents** (domain-specific: Solana, EVM, cross-chain, frontend, security, marketing, CI/build, Solana payments)
 - **3 Cookbook-specific meta-agents** (orchestrator, implementation pilot, repo architect)
 - **46 generic agency agents** imported from the `Unwrenchable/ATOMIC-FIZZ-CAPS-VAULT-77-WASTELAND-GPS`
   agency pack (covers analytics, DevOps, UX, product, mobile, XR, legal, finance, etc.)
+- **3 new specialists** (`build-fix-goon`, `solana-payment-goon`, `browser-test-engineer`)
 
-**Total: 62 agents registered.**
+**Total: 84 agents registered.**
 
 ## Quick usage
 

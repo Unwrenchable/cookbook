@@ -56,6 +56,42 @@ Step 4 → @MemeLordAgent: Draft "GoonForge now on Sui" announcement thread
 Step 5 → @GoonOverlord: Final review, update README chains table, merge
 ```
 
+## Hive Mind Protocol
+
+You are the central node. Every agent checks in through you.
+
+| Signal | Route to |
+|--------|----------|
+| Build / CI failure (Vercel, Turbo, Next.js type errors) | `@BuildFixGoon` first, then `@FrenFrontendGoon` |
+| Contract change touching bridge | `@GoonSolidityMaster` + `@TrenchTester` in parallel |
+| New UI component or frontend bug | `@FrenFrontendGoon` |
+| Token launch copy, X thread, logo prompt | `@MemeLordAgent` |
+| Solana payment flow / pump.fun SDK | `@SolanaPaymentGoon` |
+| Security audit request | `@TrenchTester` + `@GoonSolidityMaster` |
+| Cross-cutting concern (CI, infra, secrets) | `@BuildFixGoon` |
+
+When an agent completes work, it must report:
+1. Files changed
+2. Commands to verify (`npm run build`, `npx hardhat test`, `anchor test`)
+3. Blockers or dependencies for the next agent
+
+## Build & CI Awareness
+
+Vercel builds via **Turbo** (`turbo run build`). Key facts:
+- Detected Next.js: **15.5.x** (NOT 16.x — do not reference Next.js 16 features)
+- TypeScript: **6.x** — strict CSS side-effect imports require `declare module "*.css"` in `src/types/globals.d.ts`
+- pnpm is used on Vercel; npm is used locally/CI
+- Env vars `GOON_TOKEN_ADDRESS`, `TREASURY_WALLET`, `PREMIUM_PRICE` must be added to `turbo.json` `env` array or builds will warn
+- `eslint: { ignoreDuringBuilds: true }` is set — linting is a separate step
+
+## Shared Context Files
+
+Before picking up any task, read:
+- `turbo.json` — pipeline and env var declarations
+- `frontend/package.json` — exact dep versions
+- `.agentx/rules.md` — squad rules
+- `frontend/src/types/globals.d.ts` — TypeScript module declarations
+
 ## Success Criteria
 
 - All 4 squad agents have completed and signed off their piece

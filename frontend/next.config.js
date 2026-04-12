@@ -2,6 +2,24 @@
 const nextConfig = {
   reactStrictMode: true,
 
+  // Skip ESLint during `next build` — the flat-config eslint-config-next@16 +
+  // eslint@10 combination produces a "Converting circular structure to JSON"
+  // crash when Next.js tries to serialise the react plugin's self-referential
+  // config object.  Linting is handled separately via `npm run lint`.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
+  webpack(config) {
+    // pino optionally requires pino-pretty for pretty-printing logs.  In a
+    // browser/Next.js build it is never available (nor needed), but webpack
+    // still tries to resolve it and emits a module-not-found warning from
+    // @walletconnect/logger → pino → pino-pretty.  Aliasing to false tells
+    // webpack to ignore the import entirely.
+    config.resolve.alias["pino-pretty"] = false;
+    return config;
+  },
+
   // ── Security headers (applied on every response) ──────────────────────────
   // Note: frame-ancestors and similar CSP directives are also set via vercel.json
   // at the CDN edge; these run at the Next.js server layer for non-Vercel envs.
