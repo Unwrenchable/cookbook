@@ -38,6 +38,36 @@ const ERC20_TRANSFER_ABI = [
   },
 ] as const;
 
+// ─── Address-type detection ───────────────────────────────────────────────────
+
+/** Known chain types that GoonVerify can identify from the address format. */
+type ChainType = "evm" | "solana" | "generic";
+
+/** Solana base-58 alphabet (no 0, O, I, l). */
+const SOLANA_BASE58_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+/**
+ * Detect the chain a given address string belongs to.
+ * Returns `null` when the input does not look like any recognised address.
+ */
+function detectChain(address: string): ChainType | null {
+  const trimmed = address.trim();
+  if (!trimmed) return null;
+  // EVM: 0x + exactly 40 hex characters
+  if (/^0x[0-9a-fA-F]{40}$/.test(trimmed)) return "evm";
+  // Solana: base-58, 32–44 characters
+  if (SOLANA_BASE58_RE.test(trimmed)) return "solana";
+  // Generic: anything else that is at least 25 characters long and has no whitespace
+  if (trimmed.length >= 25 && !/\s/.test(trimmed)) return "generic";
+  return null;
+}
+
+const CHAIN_LABELS: Record<ChainType, string> = {
+  evm:     "⬡ EVM",
+  solana:  "◎ Solana",
+  generic: "🔗 Generic",
+};
+
 // ─── Mock scan logic ──────────────────────────────────────────────────────────
 
 interface ScanResult {
@@ -56,7 +86,10 @@ interface RiskItem {
 
 function mockScan(address: string): ScanResult {
   // Deterministic-ish mock based on address chars for demo variety.
-  const seed = parseInt(address.slice(2, 6) || "abcd", 16) % 100;
+  // Skip a leading "0x" prefix if present so the seed is always drawn from
+  // actual address content regardless of chain type.
+  const stripped = address.startsWith("0x") ? address.slice(2) : address;
+  const seed = parseInt(stripped.slice(0, 4) || "abcd", 16) % 100;
   const trustScore = Math.min(100, Math.max(55, 100 - (seed % 45)));
 
   const risks: RiskItem[] = [
@@ -174,7 +207,8 @@ export function VerifyPanel() {
   // Mark as verified when payment confirms
   const hasVerification = isVerified || isConfirmed;
 
-  const isValidAddr = contractAddr.startsWith("0x") && contractAddr.length === 42;
+  const detectedChain = detectChain(contractAddr);
+  const isValidAddr   = detectedChain !== null;
 
   // ── Free scan ──────────────────────────────────────────────────────────────
 
@@ -217,11 +251,12 @@ export function VerifyPanel() {
 
   const handleGoonItNow = useCallback(() => {
     const params = new URLSearchParams();
-    params.set("tab", "evm");
+    // Route to the matching chain tab; fall back to "evm" for generic addresses.
+    params.set("tab", detectedChain === "solana" ? "solana" : "evm");
     if (isValidAddr) params.set("contract", contractAddr);
     if (hasVerification) params.set("verified", "true");
     router.push(`/?${params.toString()}`);
-  }, [router, contractAddr, isValidAddr, hasVerification]);
+  }, [router, contractAddr, isValidAddr, hasVerification, detectedChain]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -267,21 +302,28 @@ export function VerifyPanel() {
         {/* Address input */}
         {inputMode === "address" ? (
           <div className="space-y-2">
-            <input
-              id="verify-contract-addr"
-              type="text"
-              value={contractAddr}
-              onChange={(e) => {
-                setContractAddr(e.target.value.trim());
-                setScanResult(null);
-                setIsVerified(false);
-              }}
-              placeholder="0x… contract address"
-              aria-label="Contract address to verify"
-              className="w-full rounded-xl border border-dark-border bg-dark-muted px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-brand-500/50 focus:outline-none font-mono"
-            />
+            <div className="relative">
+              <input
+                id="verify-contract-addr"
+                type="text"
+                value={contractAddr}
+                onChange={(e) => {
+                  setContractAddr(e.target.value.trim());
+                  setScanResult(null);
+                  setIsVerified(false);
+                }}
+                placeholder="EVM 0x…, Solana base58, or any contract address"
+                aria-label="Contract address to verify"
+                className="w-full rounded-xl border border-dark-border bg-dark-muted px-4 py-3 text-sm text-white placeholder-gray-600 focus:border-brand-500/50 focus:outline-none font-mono"
+              />
+              {detectedChain && (
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full border border-brand-500/30 bg-brand-500/15 px-2.5 py-0.5 text-[10px] font-bold text-brand-300 pointer-events-none">
+                  {CHAIN_LABELS[detectedChain]}
+                </span>
+              )}
+            </div>
             {contractAddr && !isValidAddr && (
-              <p className="text-xs text-red-400">Must be a valid 0x-prefixed 42-character address.</p>
+              <p className="text-xs text-red-400">Please enter a valid contract address (EVM, Solana, or other chain).</p>
             )}
           </div>
         ) : (
