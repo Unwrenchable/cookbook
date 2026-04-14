@@ -8,6 +8,8 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useNetwork } from "@/lib/networkContext";
+import { useChainMode } from "@/context/ChainModeContext";
+import { ChainModeToggle } from "@/components/ChainModeToggle";
 
 const SolanaWalletBtn = dynamic(
   () => import("@/components/SolanaWalletBtn").then((m) => m.SolanaWalletBtn),
@@ -26,6 +28,7 @@ const NAV_TABS = [
 export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const { isTestnet, setIsTestnet } = useNetwork();
+  const { chainMode } = useChainMode();
 
   return (
     <header className="sticky top-0 z-50 border-b border-surface-5/80 bg-surface-1/90 backdrop-blur-2xl">
@@ -68,6 +71,9 @@ export function Navbar() {
 
         {/* ── Right controls ─────────────────────────────────────────── */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Chain mode toggle (EVM ↔ SOL) */}
+          <ChainModeToggle />
+
           {/* Testnet / Mainnet pill */}
           <button
             type="button"
@@ -86,13 +92,14 @@ export function Navbar() {
             {isTestnet ? "Testnet" : "Mainnet"}
           </button>
 
-          {/* Solana wallet (desktop md+) */}
-          <div className="hidden md:flex">
-            <SolanaWalletBtn />
-          </div>
-
-          {/* RainbowKit connect */}
-          <ConnectButton accountStatus="avatar" showBalance={false} chainStatus="icon" />
+          {/* Wallet button — shown based on chain mode */}
+          {chainMode === "solana" ? (
+            <div className="hidden md:flex">
+              <SolanaWalletBtn />
+            </div>
+          ) : (
+            <ConnectButton accountStatus="avatar" showBalance={false} chainStatus="icon" />
+          )}
 
           {/* Mobile hamburger */}
           <button
@@ -121,6 +128,11 @@ export function Navbar() {
             </Link>
           ))}
           <div className="pt-3 border-t border-surface-5/50 mt-1 space-y-2.5">
+            {/* Chain mode toggle in mobile */}
+            <div>
+              <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Chain Mode</p>
+              <ChainModeToggle />
+            </div>
             <button
               type="button"
               onClick={() => setIsTestnet(!isTestnet)}
@@ -133,10 +145,18 @@ export function Navbar() {
               <span className={`h-1.5 w-1.5 rounded-full ${isTestnet ? "bg-yellow-400 animate-pulse" : "bg-brand-500"}`} />
               {isTestnet ? "🧪 Testnet Mode" : "🌐 Mainnet Mode"}
             </button>
-            <div>
-              <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Solana Wallet</p>
-              <SolanaWalletBtn fullWidth />
-            </div>
+            {/* Wallet per chain mode */}
+            {chainMode === "solana" ? (
+              <div>
+                <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">Solana Wallet</p>
+                <SolanaWalletBtn fullWidth />
+              </div>
+            ) : (
+              <div>
+                <p className="text-[10px] text-slate-600 uppercase tracking-wider mb-1.5">EVM Wallet</p>
+                <ConnectButton accountStatus="full" showBalance={false} chainStatus="icon" />
+              </div>
+            )}
           </div>
         </div>
       )}
