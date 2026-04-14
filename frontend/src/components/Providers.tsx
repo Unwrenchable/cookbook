@@ -9,6 +9,7 @@ import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { wagmiConfig } from "@/lib/wagmiConfig";
 import { NetworkProvider, useNetwork } from "@/lib/networkContext";
+import { ChainModeProvider } from "@/context/ChainModeContext";
 import "@rainbow-me/rainbowkit/styles.css";
 
 const SolanaProviders = dynamic(
@@ -34,8 +35,10 @@ function InnerProviders({ children }: { children: React.ReactNode }) {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <NetworkProvider>
-      <InnerProviders>{children}</InnerProviders>
-    </NetworkProvider>
+    <ChainModeProvider>
+      <NetworkProvider>
+        <InnerProviders>{children}</InnerProviders>
+      </NetworkProvider>
+    </ChainModeProvider>
   );
 }
