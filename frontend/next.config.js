@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const path = require("path");
+
 const nextConfig = {
   reactStrictMode: true,
 
@@ -10,13 +12,31 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
 
-  webpack(config) {
+  webpack(config, { isServer }) {
     // pino optionally requires pino-pretty for pretty-printing logs.  In a
     // browser/Next.js build it is never available (nor needed), but webpack
     // still tries to resolve it and emits a module-not-found warning from
     // @walletconnect/logger → pino → pino-pretty.  Aliasing to false tells
     // webpack to ignore the import entirely.
     config.resolve.alias["pino-pretty"] = false;
+
+    if (isServer) {
+      // @walletconnect/keyvaluestorage@1.1.1 imports its browser module (idb.ts)
+      // at the top level. That module immediately calls idb-keyval's createStore(),
+      // which calls `indexedDB.open()` directly (no typeof guard). In Node.js
+      // (SSR / static-generation), `indexedDB` is not a declared global and throws:
+      //
+      //   ReferenceError: indexedDB is not defined
+      //
+      // Replacing the package with a no-op stub for server builds prevents the
+      // crash. Wallet storage is never needed server-side (connections only happen
+      // in the browser), so the stub is behaviourally correct.
+      config.resolve.alias["@walletconnect/keyvaluestorage"] = path.resolve(
+        __dirname,
+        "src/stubs/wc-keyvaluestorage-stub.js"
+      );
+    }
+
     return config;
   },
 
