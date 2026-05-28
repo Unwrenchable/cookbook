@@ -27,7 +27,7 @@
     "clean": "turbo run clean --parallel"
   },
   "devDependencies": {
-    "turbo": "^2.9.4"
+    "turbo": "^2.9.14"
   },
   "overrides": {
     "axios": "^1.15.0",
