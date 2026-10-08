@@ -3,154 +3,134 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "../governance/DelayedAdmin.sol";
+import "./IWormhole.sol";
 
-// ─── Interfaces (Moved outside the contract) ──────────────────────────────────
-
-/**
- * @dev Minimal interface for the minted token. 
- * This must be outside the contract block to satisfy the Solidity parser.
- */
 interface IMintable {
     function mint(address to, uint256 amount) external;
 }
 
 /**
  * @title BurnBridgeReceiver
- * @notice EVM side of the TokenForge cross-chain burn-to-activate mechanic.
+ * @notice Mints an ERC-20 after Wormhole core verifies a guardian-signed VAA.
+ *         The emitter chain and address must be on the allowlist. Replay uses the
+ *         VAA hash and the (emitter, sequence) pair. Payload length is exactly 114 bytes.
  */
-contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
-
-    // ─── State ────────────────────────────────────────────────────────────────
-
-    /// Wormhole core bridge address on this chain
+contract BurnBridgeReceiver is Ownable, ReentrancyGuard, DelayedAdmin {
     address public wormholeCore;
 
-    /// Wormhole chain ID of Solana (always 1)
-    uint16  public constant SOLANA_CHAIN_ID = 1;
+    /// Wormhole chain ID of Solana.
+    uint16 public constant SOLANA_CHAIN_ID = 1;
 
-    /// Wormhole chain ID of this EVM chain
-    uint16  public immutable thisChainId;
+    uint16 public immutable thisChainId;
 
-    /// The Solana program ID (emitter address) that is allowed to send messages.
+    /// Primary Solana emitter recorded at deploy. Further emitters go through the timelock.
     bytes32 public trustedSolanaEmitter;
 
-    /// The ERC20 token that will be minted on successful bridge calls.
     address public mintableToken;
-
-    /// Minting ratio: EVM tokens minted per 1 raw Solana token unit.
     uint256 public mintRatio;
 
-    /// Replay prevention: tracks processed (emitter, sequence) pairs
+    /// VAA hash and sequence keys that have already minted.
     mapping(bytes32 => bool) public processedMessages;
 
-    /// Trusted off-chain relayers
-    mapping(address => bool) public isTrustedRelayer;
+    /// emitterChainId => emitterAddress => allowed.
+    mapping(uint16 => mapping(bytes32 => bool)) public trustedEmitters;
 
     /// When false, targetChainId 0 cannot mint on this chain.
-    /// A single Solana burn with target 0 would otherwise mint on every receiver.
     bool public acceptWildcardTarget;
-
-    // ─── Events ───────────────────────────────────────────────────────────────
 
     event TokensActivated(
         bytes32 indexed solanaSourceMint,
         bytes32 indexed solanaSender,
         address indexed evmRecipient,
         uint256 amountMinted,
-        uint64  solanaNonce
+        uint64 solanaNonce
     );
 
-    event RelayerUpdated(address relayer, bool trusted);
     event MintableTokenUpdated(address token);
     event MintRatioUpdated(uint256 ratio);
     event WormholeCoreUpdated(address core);
-    event TrustedEmitterUpdated(bytes32 emitter);
+    event TrustedEmitterUpdated(uint16 chainId, bytes32 emitter, bool allowed);
     event WildcardTargetUpdated(bool enabled);
 
-    // ─── Constructor ──────────────────────────────────────────────────────────
+    bytes32 private constant _TAG_TOKEN = keccak256("setMintableToken");
+    bytes32 private constant _TAG_RATIO = keccak256("setMintRatio");
+    bytes32 private constant _TAG_CORE = keccak256("setWormholeCore");
+    bytes32 private constant _TAG_EMITTER = keccak256("setTrustedEmitter");
+    bytes32 private constant _TAG_WILDCARD = keccak256("setAcceptWildcardTarget");
+
+    modifier onlyAdmin() override {
+        _checkOwner();
+        _;
+    }
 
     constructor(
-        uint16  _thisChainId,
+        uint16 _thisChainId,
         address _wormholeCore,
         bytes32 _trustedSolanaEmitter,
         address _mintableToken,
         uint256 _mintRatio
     ) Ownable(msg.sender) {
-        require(_wormholeCore       != address(0), "BurnBridgeReceiver: zero wormhole");
-        require(_mintableToken      != address(0), "BurnBridgeReceiver: zero token");
-        require(_mintRatio          > 0,           "BurnBridgeReceiver: zero ratio");
+        require(_wormholeCore != address(0), "BurnBridgeReceiver: zero wormhole");
+        require(_mintableToken != address(0), "BurnBridgeReceiver: zero token");
+        require(_mintRatio > 0, "BurnBridgeReceiver: zero ratio");
 
-        thisChainId           = _thisChainId;
-        wormholeCore          = _wormholeCore;
-        trustedSolanaEmitter  = _trustedSolanaEmitter;
-        mintableToken         = _mintableToken;
-        mintRatio             = _mintRatio;
-    }
-
-    // ─── Core: receive message ────────────────────────────────────────────────
-
-    function receiveMessage(bytes calldata) external pure {
-        // Reverts explicitly until Wormhole dependencies are pinned and integrated.
-        revert("BurnBridgeReceiver: Wormhole VAA verification not implemented; use receiveRelayedMessage");
+        _initAdminDelay(24 hours);
+        thisChainId = _thisChainId;
+        wormholeCore = _wormholeCore;
+        trustedSolanaEmitter = _trustedSolanaEmitter;
+        mintableToken = _mintableToken;
+        mintRatio = _mintRatio;
+        if (_trustedSolanaEmitter != bytes32(0)) {
+            trustedEmitters[SOLANA_CHAIN_ID][_trustedSolanaEmitter] = true;
+        }
     }
 
     /**
-     * @notice Receives a pre-decoded bridge payload from a trusted off-chain relayer.
-     * @dev    The replay-prevention key is derived from the payload content rather
-     *         than accepted as a caller parameter.  Accepting a caller-supplied key
-     *         would allow a compromised relayer to bypass replay protection by
-     *         submitting the same payload with a different key each time.
-     * @param  payload ABI-encoded bridge payload (114 bytes minimum).
+     * @notice Submit a guardian-signed VAA. Anyone may call this.
+     *         Wormhole core checks the guardian signatures. This contract checks
+     *         the emitter allowlist, the VAA hash, the sequence, and the payload.
      */
-    function receiveRelayedMessage(bytes calldata payload) external nonReentrant {
-        require(isTrustedRelayer[msg.sender], "BurnBridgeReceiver: not a trusted relayer");
+    function receiveMessage(bytes calldata encodedVAA) external nonReentrant {
+        (IWormhole.VM memory vm, bool valid,) = IWormhole(wormholeCore).parseAndVerifyVM(encodedVAA);
+        require(valid, "BurnBridgeReceiver: invalid VAA");
+        require(vm.hash != bytes32(0), "BurnBridgeReceiver: empty VAA hash");
+        require(
+            trustedEmitters[vm.emitterChainId][vm.emitterAddress],
+            "BurnBridgeReceiver: emitter not allowed"
+        );
 
-        // Derive replay key from payload content — cannot be manipulated by caller
-        bytes32 messageKey = keccak256(payload);
-        require(!processedMessages[messageKey], "BurnBridgeReceiver: already processed");
-        processedMessages[messageKey] = true;
+        require(!processedMessages[vm.hash], "BurnBridgeReceiver: already processed");
+        bytes32 seqKey = keccak256(abi.encode(vm.emitterChainId, vm.emitterAddress, vm.sequence));
+        require(!processedMessages[seqKey], "BurnBridgeReceiver: sequence used");
+        processedMessages[vm.hash] = true;
+        processedMessages[seqKey] = true;
 
-        _processPayload(payload);
+        _processPayload(vm.payload);
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
-
-    function _processPayload(bytes calldata payload) internal {
-        // Exact length: extra trailing bytes used to change keccak256(payload)
-        // while parsing the same fields, which bypassed replay protection.
+    function _processPayload(bytes memory payload) internal {
         require(payload.length == 114, "BurnBridgeReceiver: bad payload length");
 
         bytes32 solanaSourceMint;
         bytes32 solanaSender;
         address evmRecipient;
-        uint64  amountBurned;
-        uint16  targetChainId;
-        uint64  nonce;
+        uint64 amountBurned;
+        uint16 targetChainId;
+        uint64 nonce;
 
-        // Using assembly to pull specific bytes from the payload
         assembly {
-            let ptr := payload.offset
-            solanaSourceMint := calldataload(ptr)
-            solanaSender     := calldataload(add(ptr, 32))
-            
-            // Recipient is 32 bytes in payload, but EVM address is 20 bytes.
-            // We load the 32 bytes and shift right to get the address.
-            evmRecipient     := shr(96, calldataload(add(ptr, 64)))
-            
-            // amountBurned (8 bytes) starts at offset 96. 
-            // We load the 32-byte word starting there and shift right 192 bits (24 bytes).
-            amountBurned     := shr(192, calldataload(add(ptr, 96)))
-            
-            // targetChainId (2 bytes) starts at offset 104.
-            // Shift right 240 bits (30 bytes).
-            targetChainId    := shr(240, calldataload(add(ptr, 104)))
-            
-            // nonce (8 bytes) starts at offset 106.
-            // Shift right 192 bits (24 bytes).
-            nonce            := shr(192, calldataload(add(ptr, 106)))
+            let ptr := add(payload, 32)
+            solanaSourceMint := mload(ptr)
+            solanaSender := mload(add(ptr, 32))
+            evmRecipient := shr(96, mload(add(ptr, 64)))
+            amountBurned := shr(192, mload(add(ptr, 96)))
+            targetChainId := shr(240, mload(add(ptr, 104)))
+            nonce := shr(192, mload(add(ptr, 106)))
         }
 
         require(evmRecipient != address(0), "BurnBridgeReceiver: zero recipient");
+        require(amountBurned > 0, "BurnBridgeReceiver: zero amount");
         if (targetChainId == 0) {
             require(acceptWildcardTarget, "BurnBridgeReceiver: wildcard target disabled");
         } else {
@@ -158,50 +138,70 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
         }
 
         uint256 mintAmount = uint256(amountBurned) * mintRatio;
-        require(mintAmount > 0, "BurnBridgeReceiver: zero mint amount");
+        require(mintAmount / uint256(amountBurned) == mintRatio, "BurnBridgeReceiver: amount overflow");
 
         IMintable(mintableToken).mint(evmRecipient, mintAmount);
 
-        emit TokensActivated(
-            solanaSourceMint,
-            solanaSender,
-            evmRecipient,
-            mintAmount,
-            nonce
-        );
+        emit TokensActivated(solanaSourceMint, solanaSender, evmRecipient, mintAmount, nonce);
     }
 
-    // ─── Admin ────────────────────────────────────────────────────────────────
-
-    function setTrustedRelayer(address relayer, bool trusted) external onlyOwner {
-        isTrustedRelayer[relayer] = trusted;
-        emit RelayerUpdated(relayer, trusted);
-    }
-
-    function setMintableToken(address token) external onlyOwner {
+    function queueSetMintableToken(address token) external onlyOwner returns (bytes32 opId, uint256 eta) {
         require(token != address(0), "BurnBridgeReceiver: zero token");
+        return _queue(_TAG_TOKEN, abi.encode(token));
+    }
+
+    function executeSetMintableToken(address token, uint256 eta) external {
+        _consume(_TAG_TOKEN, abi.encode(token), eta);
         mintableToken = token;
         emit MintableTokenUpdated(token);
     }
 
-    function setMintRatio(uint256 ratio) external onlyOwner {
+    function queueSetMintRatio(uint256 ratio) external onlyOwner returns (bytes32 opId, uint256 eta) {
         require(ratio > 0, "BurnBridgeReceiver: zero ratio");
+        return _queue(_TAG_RATIO, abi.encode(ratio));
+    }
+
+    function executeSetMintRatio(uint256 ratio, uint256 eta) external {
+        _consume(_TAG_RATIO, abi.encode(ratio), eta);
         mintRatio = ratio;
         emit MintRatioUpdated(ratio);
     }
 
-    function setWormholeCore(address core) external onlyOwner {
+    function queueSetWormholeCore(address core) external onlyOwner returns (bytes32 opId, uint256 eta) {
         require(core != address(0), "BurnBridgeReceiver: zero core");
+        return _queue(_TAG_CORE, abi.encode(core));
+    }
+
+    function executeSetWormholeCore(address core, uint256 eta) external {
+        _consume(_TAG_CORE, abi.encode(core), eta);
         wormholeCore = core;
         emit WormholeCoreUpdated(core);
     }
 
-    function setTrustedSolanaEmitter(bytes32 emitter) external onlyOwner {
-        trustedSolanaEmitter = emitter;
-        emit TrustedEmitterUpdated(emitter);
+    function queueSetTrustedEmitter(uint16 chainId, bytes32 emitter, bool allowed)
+        external
+        onlyOwner
+        returns (bytes32 opId, uint256 eta)
+    {
+        require(emitter != bytes32(0), "BurnBridgeReceiver: zero emitter");
+        return _queue(_TAG_EMITTER, abi.encode(chainId, emitter, allowed));
     }
 
-    function setAcceptWildcardTarget(bool enabled) external onlyOwner {
+    function executeSetTrustedEmitter(uint16 chainId, bytes32 emitter, bool allowed, uint256 eta) external {
+        _consume(_TAG_EMITTER, abi.encode(chainId, emitter, allowed), eta);
+        trustedEmitters[chainId][emitter] = allowed;
+        if (chainId == SOLANA_CHAIN_ID && allowed) {
+            trustedSolanaEmitter = emitter;
+        }
+        emit TrustedEmitterUpdated(chainId, emitter, allowed);
+    }
+
+    function queueSetAcceptWildcardTarget(bool enabled) external onlyOwner returns (bytes32 opId, uint256 eta) {
+        return _queue(_TAG_WILDCARD, abi.encode(enabled));
+    }
+
+    function executeSetAcceptWildcardTarget(bool enabled, uint256 eta) external {
+        _consume(_TAG_WILDCARD, abi.encode(enabled), eta);
         acceptWildcardTarget = enabled;
         emit WildcardTargetUpdated(enabled);
     }

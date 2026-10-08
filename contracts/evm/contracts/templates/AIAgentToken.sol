@@ -41,6 +41,7 @@ contract AIAgentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     // ─── Events ───────────────────────────────────────────────────────────────
     event AgentAction(address indexed agent, string action, uint256 amount, string meta);
     event AgentWalletUpdated(address newAgent);
+    event AgentBurnCapUpdated(uint16 bps);
     event MemePosted(string uri, uint256 timestamp);
     event TreasuryDeposit(address from, uint256 amount);
 
@@ -155,6 +156,7 @@ contract AIAgentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     function setAgentBurnCap(uint16 bps) external onlyOwner {
         require(bps <= 500, "AIAgentToken: burn cap > 5 %/day");
         agentBurnCapBps = bps;
+        emit AgentBurnCapUpdated(bps);
     }
 
     // ─── Internal ─────────────────────────────────────────────────────────────

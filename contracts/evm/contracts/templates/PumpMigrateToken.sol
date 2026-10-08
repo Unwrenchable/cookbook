@@ -6,6 +6,23 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../libraries/LinearCurve.sol";
 
+interface IDexRouter {
+    function factory() external view returns (address);
+    function WETH() external view returns (address);
+    function addLiquidityETH(
+        address token,
+        uint256 amountTokenDesired,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
+        address to,
+        uint256 deadline
+    ) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity);
+}
+
+interface IDexFactory {
+    function getPair(address tokenA, address tokenB) external view returns (address);
+}
+
 /**
  * @title PumpMigrateToken
  * @notice Bonding curve token that automatically "graduates" to CEX-ready status
@@ -17,10 +34,10 @@ import "../libraries/LinearCurve.sol";
  * Flow:
  *  1. Token launches with a virtual token reserve (a supply offset, not a wei balance).
  *  2. Users buy via `buy()` — price increases linearly with supply.
- *  3. When `ethReserve >= graduationThreshold` → `_graduate()` is triggered.
- *  4. Graduation: trading pauses for 24 h, emits `Graduated` event,
- *     owner calls `addLiquidityToDex()` to create an LP pair.
- *  5. After LP is added, normal trading resumes on DEX.
+ *  3. When `ethReserve >= graduationThreshold` the same buy migrates the reserve
+ *     and an equal token amount into the configured Uniswap V2-style router.
+ *  4. LP tokens are minted to the burn address. Curve trading stays halted.
+ *  5. The router is locked once trading has started, and migration can run once.
  *
  * This matches the pump.fun → Raydium migration pattern on Solana,
  * adapted for EVM (pump.fun → Uniswap/PancakeSwap).
@@ -38,11 +55,16 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
     uint256 public virtualTokenReserve;
 
     // ─── Graduation ───────────────────────────────────────────────────────────
-    uint256 public graduationThreshold; // ETH needed to graduate (e.g. 0.085 ETH on L2, 85 ETH on mainnet)
+    uint256 public graduationThreshold;
     bool    public isGraduated;
     bool    public tradingPaused;
+    bool    public liquidityMigrated;
     uint256 public graduatedAt;
-    uint256 public constant PAUSE_DURATION = 24 hours;
+    /// @notice LP is sent here so the creator cannot pull the pool.
+    address public constant LP_BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
+    /// @notice Minimum share of the reserve the router must keep. 9900 = 99%.
+    uint16  public minMigrateEthBps;
+    uint16  public constant MAX_TRADING_FEE_BPS = 300;
 
     // ─── DEX config (set by owner after graduation) ───────────────────────────
     address public dexRouter;        // Uniswap / PancakeSwap router
@@ -58,7 +80,8 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
     event Sell(address indexed seller, uint256 tokenAmount, uint256 ethReturned);
     event Graduated(uint256 ethReserve, uint256 totalSupply, uint256 timestamp);
     event LiquidityAdded(address pair, uint256 tokens, uint256 eth);
-    event TradingResumed();
+    event DexRouterUpdated(address router);
+    event MinMigrateEthBpsUpdated(uint16 bps);
 
     // ─── Reentrancy guard ─────────────────────────────────────────────────────
     uint256 private _reentrancyStatus;
@@ -94,7 +117,7 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
         address owner_
     ) external initializer {
         require(owner_    != address(0), "PumpMigrateToken: zero owner");
-        require(tradingFeeBps_ <= 300,   "PumpMigrateToken: fee > 3 %");
+        require(tradingFeeBps_ <= MAX_TRADING_FEE_BPS, "PumpMigrateToken: fee > 3 %");
 
         __ERC20_init(name_, symbol_);
         __Ownable_init(owner_);
@@ -113,8 +136,9 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
         // to totalSupply() priced the first token at tens of ETH.
         virtualEthReserve    = 0;
         virtualTokenReserve  = 1_000_000;
-        basePrice            = 1e9;    // ~1e-9 ETH per raw token at zero supply
+        basePrice            = 1e9;
         slope                = 1e3;
+        minMigrateEthBps     = 9900;
     }
 
     function decimals() public view override returns (uint8) { return _tokenDecimals; }
@@ -154,7 +178,7 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
         emit Buy(msg.sender, amount, cost);
 
         if (!isGraduated && ethReserve >= graduationThreshold) {
-            _graduate();
+            _migrate();
         }
     }
 
@@ -204,35 +228,54 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
 
     // ─── Graduation ───────────────────────────────────────────────────────────
 
-    function _graduate() internal {
-        isGraduated  = true;
-        tradingPaused = true;
-        graduatedAt  = block.timestamp;
-        emit Graduated(ethReserve, totalSupply(), block.timestamp);
-    }
+    function _migrate() internal {
+        require(!liquidityMigrated, "PumpMigrateToken: already migrated");
+        require(dexRouter != address(0), "PumpMigrateToken: router not set");
 
-    /**
-     * @notice Resume trading after the pause window.
-     *         Call after adding liquidity to a DEX.
-     */
-    /**
-     * @notice Resume curve trading after the pause.
-     *         The owner may record the DEX pair. Anyone may unpause once the
-     *         window has elapsed, so a missing admin call cannot freeze the reserve.
-     */
-    function resumeTrading(address pair) external {
-        require(isGraduated,   "PumpMigrateToken: not graduated");
-        require(tradingPaused, "PumpMigrateToken: not paused");
-        require(
-            block.timestamp >= graduatedAt + PAUSE_DURATION,
-            "PumpMigrateToken: 24 h pause not elapsed"
+        uint256 ethIn = ethReserve;
+        uint256 supply = totalSupply();
+        require(ethIn > 0 && supply > 0, "PumpMigrateToken: empty pool");
+
+        isGraduated = true;
+        tradingPaused = true;
+        liquidityMigrated = true;
+        graduatedAt = block.timestamp;
+        ethReserve = 0;
+
+        _mint(address(this), supply);
+        _approve(address(this), dexRouter, supply);
+
+        uint256 ethMin = (ethIn * minMigrateEthBps) / 10_000;
+        uint256 tokenMin = (supply * 9900) / 10_000;
+        (uint256 usedToken, uint256 usedEth, uint256 liquidity) = IDexRouter(dexRouter).addLiquidityETH{
+            value: ethIn
+        }(
+            address(this),
+            supply,
+            tokenMin,
+            ethMin,
+            LP_BURN_ADDRESS,
+            block.timestamp
         );
-        if (pair != address(0)) {
-            require(msg.sender == owner(), "PumpMigrateToken: only owner sets pair");
-            liquidityPair = pair;
+        require(liquidity > 0, "PumpMigrateToken: no liquidity");
+        require(usedEth >= ethMin && usedToken >= tokenMin, "PumpMigrateToken: slippage");
+
+        uint256 dust = balanceOf(address(this));
+        if (dust > 0) _burn(address(this), dust);
+        uint256 leftover = address(this).balance;
+        if (leftover > 0) {
+            (bool ok,) = feeWallet.call{value: leftover}("");
+            require(ok, "PumpMigrateToken: leftover failed");
         }
-        tradingPaused = false;
-        emit TradingResumed();
+
+        address pair = IDexFactory(IDexRouter(dexRouter).factory()).getPair(
+            address(this),
+            IDexRouter(dexRouter).WETH()
+        );
+        liquidityPair = pair;
+        lpTokensLocked = liquidity;
+        emit Graduated(ethIn, supply, block.timestamp);
+        emit LiquidityAdded(pair, usedToken, usedEth);
     }
 
     /**
@@ -254,7 +297,20 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
     // ─── Owner controls ───────────────────────────────────────────────────────
 
     function setDexRouter(address router) external onlyOwner {
+        require(!isGraduated, "PumpMigrateToken: already graduated");
+        require(dexRouter == address(0) || ethReserve == 0, "PumpMigrateToken: router locked");
+        require(router != address(0), "PumpMigrateToken: zero router");
+        require(IDexRouter(router).WETH() != address(0), "PumpMigrateToken: router missing WETH");
+        require(IDexRouter(router).factory() != address(0), "PumpMigrateToken: router missing factory");
         dexRouter = router;
+        emit DexRouterUpdated(router);
+    }
+
+    function setMinMigrateEthBps(uint16 bps) external onlyOwner {
+        require(ethReserve == 0 && !isGraduated, "PumpMigrateToken: trading already started");
+        require(bps >= 9000 && bps <= 10_000, "PumpMigrateToken: slippage bounds");
+        minMigrateEthBps = bps;
+        emit MinMigrateEthBpsUpdated(bps);
     }
 
     function setFeeWallet(address wallet) external onlyOwner {

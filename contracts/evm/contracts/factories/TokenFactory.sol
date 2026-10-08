@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/proxy/Clones.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "../governance/DelayedAdmin.sol";
 
 /**
  * @title TokenFactory
@@ -11,7 +12,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  *         One factory is deployed per chain; users call createToken() and never need to trust the deployer
  *         with private keys.
  */
-contract TokenFactory is Ownable, ReentrancyGuard {
+contract TokenFactory is Ownable, ReentrancyGuard, DelayedAdmin {
     using Clones for address;
 
     // ─── Token flavors ────────────────────────────────────────────────────────
@@ -47,6 +48,12 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     }
 
     // ─── Platform fee ─────────────────────────────────────────────────────────
+    /// @notice Hard cap on the flat launch fee. 1 native token.
+    uint256 public constant MAX_LAUNCH_FEE = 1 ether;
+    uint16 public constant MAX_LAUNCH_FEE_BPS = 1000;
+    uint16 public constant MAX_REFERRAL_SHARE_BPS = 5000;
+    uint16 public constant MAX_COMBINED_TOKEN_FEE_BPS = 3000;
+
     uint256 public launchFee;          // minimum flat fee in wei (native token)
     address public feeRecipient;
 
@@ -88,6 +95,17 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     event LaunchesPaused(bool paused);
     event ReferralEarned(address indexed referrer, address indexed user, uint256 amount);
 
+    bytes32 private constant _TAG_IMPL = keccak256("setImplementation");
+    bytes32 private constant _TAG_FEE = keccak256("setLaunchFee");
+    bytes32 private constant _TAG_RECIPIENT = keccak256("setFeeRecipient");
+    bytes32 private constant _TAG_FEE_BPS = keccak256("setLaunchFeeBps");
+    bytes32 private constant _TAG_REFERRAL = keccak256("setReferralShareBps");
+
+    modifier onlyAdmin() override {
+        _checkOwner();
+        _;
+    }
+
     // ─── Constructor ──────────────────────────────────────────────────────────
     constructor(
         address _standardImpl,
@@ -113,7 +131,9 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         require(_pumpMigrateImpl   != address(0), "TokenFactory: zero pump migrate impl");
         require(_feeRecipient      != address(0), "TokenFactory: zero fee recipient");
         require(_feeRecipient      != address(this), "TokenFactory: recipient is factory");
+        require(_launchFee         <= MAX_LAUNCH_FEE, "TokenFactory: fee too high");
 
+        _initAdminDelay(24 hours);
         standardImpl      = _standardImpl;
         taxableImpl       = _taxableImpl;
         deflationaryImpl  = _deflationaryImpl;
@@ -232,7 +252,22 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     }
 
     // ─── Admin ────────────────────────────────────────────────────────────────
-    function setImplementation(TokenFlavor flavor, address impl) external onlyOwner {
+    function queueSetImplementation(TokenFlavor flavor, address impl)
+        external
+        onlyOwner
+        returns (bytes32 opId, uint256 eta)
+    {
+        require(impl != address(0), "TokenFactory: zero impl");
+        require(uint8(flavor) <= uint8(TokenFlavor.PumpMigrate), "TokenFactory: bad flavor");
+        return _queue(_TAG_IMPL, abi.encode(flavor, impl));
+    }
+
+    function executeSetImplementation(TokenFlavor flavor, address impl, uint256 eta) external {
+        _consume(_TAG_IMPL, abi.encode(flavor, impl), eta);
+        _setImplementation(flavor, impl);
+    }
+
+    function _setImplementation(TokenFlavor flavor, address impl) internal {
         require(impl != address(0), "TokenFactory: zero impl");
         if      (flavor == TokenFlavor.Standard)      standardImpl      = impl;
         else if (flavor == TokenFlavor.Taxable)        taxableImpl       = impl;
@@ -246,28 +281,52 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         emit ImplementationUpdated(flavor, impl);
     }
 
-    function setLaunchFee(uint256 _fee) external onlyOwner {
-        launchFee = _fee;
-        emit LaunchFeeUpdated(_fee);
+    function queueSetLaunchFee(uint256 newFee) external onlyOwner returns (bytes32 opId, uint256 eta) {
+        require(newFee <= MAX_LAUNCH_FEE, "TokenFactory: fee too high");
+        return _queue(_TAG_FEE, abi.encode(newFee));
     }
 
-    function setFeeRecipient(address _recipient) external onlyOwner {
-        require(_recipient != address(0), "TokenFactory: zero recipient");
-        require(_recipient != address(this), "TokenFactory: recipient is factory");
-        feeRecipient = _recipient;
-        emit FeeRecipientUpdated(_recipient);
+    function executeSetLaunchFee(uint256 newFee, uint256 eta) external {
+        require(newFee <= MAX_LAUNCH_FEE, "TokenFactory: fee too high");
+        _consume(_TAG_FEE, abi.encode(newFee), eta);
+        launchFee = newFee;
+        emit LaunchFeeUpdated(newFee);
     }
 
-    function setLaunchFeeBps(uint16 _bps) external onlyOwner {
-        require(_bps <= 1000, "TokenFactory: bps too high");
-        launchFeeBps = _bps;
-        emit LaunchFeeBpsUpdated(_bps);
+    function queueSetFeeRecipient(address recipient) external onlyOwner returns (bytes32 opId, uint256 eta) {
+        require(recipient != address(0), "TokenFactory: zero recipient");
+        require(recipient != address(this), "TokenFactory: recipient is factory");
+        return _queue(_TAG_RECIPIENT, abi.encode(recipient));
     }
 
-    function setReferralShareBps(uint16 _bps) external onlyOwner {
-        require(_bps <= 5000, "TokenFactory: referral share too high");
-        referralShareBps = _bps;
-        emit ReferralShareBpsUpdated(_bps);
+    function executeSetFeeRecipient(address recipient, uint256 eta) external {
+        _consume(_TAG_RECIPIENT, abi.encode(recipient), eta);
+        feeRecipient = recipient;
+        emit FeeRecipientUpdated(recipient);
+    }
+
+    function queueSetLaunchFeeBps(uint16 bps) external onlyOwner returns (bytes32 opId, uint256 eta) {
+        require(bps <= MAX_LAUNCH_FEE_BPS, "TokenFactory: bps too high");
+        return _queue(_TAG_FEE_BPS, abi.encode(bps));
+    }
+
+    function executeSetLaunchFeeBps(uint16 bps, uint256 eta) external {
+        require(bps <= MAX_LAUNCH_FEE_BPS, "TokenFactory: bps too high");
+        _consume(_TAG_FEE_BPS, abi.encode(bps), eta);
+        launchFeeBps = bps;
+        emit LaunchFeeBpsUpdated(bps);
+    }
+
+    function queueSetReferralShareBps(uint16 bps) external onlyOwner returns (bytes32 opId, uint256 eta) {
+        require(bps <= MAX_REFERRAL_SHARE_BPS, "TokenFactory: referral share too high");
+        return _queue(_TAG_REFERRAL, abi.encode(bps));
+    }
+
+    function executeSetReferralShareBps(uint16 bps, uint256 eta) external {
+        require(bps <= MAX_REFERRAL_SHARE_BPS, "TokenFactory: referral share too high");
+        _consume(_TAG_REFERRAL, abi.encode(bps), eta);
+        referralShareBps = bps;
+        emit ReferralShareBpsUpdated(bps);
     }
 
     /// @notice Stop or resume new launches. Does not touch tokens already deployed.
@@ -293,7 +352,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
             uint256(params.buyTaxBps)     +
             uint256(params.sellTaxBps)    +
             uint256(params.burnBps)       +
-            uint256(params.reflectionBps) <= 3000,
+            uint256(params.reflectionBps) <= MAX_COMBINED_TOKEN_FEE_BPS,
             "TokenFactory: total fees exceed 30 %"
         );
     }

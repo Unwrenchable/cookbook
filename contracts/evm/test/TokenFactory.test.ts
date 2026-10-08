@@ -1,7 +1,16 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { TokenFactory, StandardERC20, TaxableERC20, DeflationaryERC20, ReflectionERC20, BondingCurveToken } from "../typechain-types";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+
+async function queuedEta(txPromise: Promise<{ wait: () => Promise<any> }>): Promise<bigint> {
+  const receipt = await (await txPromise).wait();
+  const log = receipt.logs.find((l: any) => l.fragment?.name === "AdminOpQueued");
+  const eta = log.args.eta as bigint;
+  await time.increaseTo(eta);
+  return eta;
+}
 
 // TokenFlavor enum (mirrors the Solidity enum – keep in sync with TokenFactory.sol)
 enum TokenFlavor {
@@ -407,26 +416,30 @@ describe("TokenFactory", function () {
   describe("Admin functions", function () {
     it("Owner can update launch fee", async function () {
       const newFee = ethers.parseEther("0.002");
-      await factory.connect(owner).setLaunchFee(newFee);
+      const eta = await queuedEta(factory.connect(owner).queueSetLaunchFee(newFee));
+      await factory.executeSetLaunchFee(newFee, eta);
       expect(await factory.launchFee()).to.equal(newFee);
     });
 
     it("Non-owner cannot update launch fee", async function () {
       await expect(
-        factory.connect(user1).setLaunchFee(0n)
+        factory.connect(user1).queueSetLaunchFee(0n)
       ).to.be.revertedWithCustomError(factory, "OwnableUnauthorizedAccount");
     });
 
     it("Owner can update fee recipient", async function () {
-      await factory.connect(owner).setFeeRecipient(user2.address);
+      const eta = await queuedEta(factory.connect(owner).queueSetFeeRecipient(user2.address));
+      await factory.executeSetFeeRecipient(user2.address, eta);
       expect(await factory.feeRecipient()).to.equal(user2.address);
     });
 
     it("Owner can update implementation address", async function () {
       const newImpl = await (await ethers.getContractFactory("StandardERC20")).deploy();
       await newImpl.waitForDeployment();
-      await factory.connect(owner).setImplementation(TokenFlavor.Standard, await newImpl.getAddress());
-      expect(await factory.standardImpl()).to.equal(await newImpl.getAddress());
+      const impl = await newImpl.getAddress();
+      const eta = await queuedEta(factory.connect(owner).queueSetImplementation(TokenFlavor.Standard, impl));
+      await factory.executeSetImplementation(TokenFlavor.Standard, impl, eta);
+      expect(await factory.standardImpl()).to.equal(impl);
     });
 
     it("Owner can deploy multiple tokens and totalTokensDeployed increments", async function () {
@@ -772,27 +785,27 @@ describe("Referral system", function () {
   });
 
   it("owner can set launchFeeBps", async function () {
-    await expect(factory.connect(owner).setLaunchFeeBps(100))
+    const eta = await queuedEta(factory.connect(owner).queueSetLaunchFeeBps(100));
+    await expect(factory.executeSetLaunchFeeBps(100, eta))
       .to.emit(factory, "LaunchFeeBpsUpdated").withArgs(100);
     expect(await factory.launchFeeBps()).to.equal(100n);
 
-    // Non-owner cannot set
-    await expect(factory.connect(user1).setLaunchFeeBps(10))
+    await expect(factory.connect(user1).queueSetLaunchFeeBps(10))
       .to.be.reverted;
   });
 
   it("setLaunchFeeBps reverts when bps > 1000", async function () {
-    await expect(factory.connect(owner).setLaunchFeeBps(1001))
+    await expect(factory.connect(owner).queueSetLaunchFeeBps(1001))
       .to.be.revertedWith("TokenFactory: bps too high");
   });
 
   it("owner can set referralShareBps", async function () {
-    await expect(factory.connect(owner).setReferralShareBps(3000))
+    const eta = await queuedEta(factory.connect(owner).queueSetReferralShareBps(3000));
+    await expect(factory.executeSetReferralShareBps(3000, eta))
       .to.emit(factory, "ReferralShareBpsUpdated").withArgs(3000);
     expect(await factory.referralShareBps()).to.equal(3000n);
 
-    // Non-owner cannot set
-    await expect(factory.connect(user1).setReferralShareBps(100))
+    await expect(factory.connect(user1).queueSetReferralShareBps(100))
       .to.be.reverted;
   });
 });

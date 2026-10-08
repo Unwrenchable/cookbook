@@ -64,6 +64,8 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
     event Unstaked(address indexed user, uint256 amount);
     event RewardsClaimed(address indexed user, uint256 amount);
     event RewardPoolFunded(uint256 amount);
+    event RewardRateUpdated(uint16 bps);
+    event BurnBpsUpdated(uint16 bps);
     event ProposalCreated(uint256 indexed id, string description, uint256 endTime);
     event Voted(uint256 indexed proposalId, address indexed voter, bool support, uint256 weight);
 
@@ -251,10 +253,12 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
     function setRewardRate(uint16 bps) external onlyOwner {
         require(bps <= 500, "UtilityHybridToken: reward > 5 %/day");
         rewardRateBps = bps;
+        emit RewardRateUpdated(bps);
     }
 
     function setBurnBps(uint16 bps) external onlyOwner {
         require(bps <= 500, "UtilityHybridToken: burn > 5 %");
         burnBps = bps;
+        emit BurnBpsUpdated(bps);
     }
 }

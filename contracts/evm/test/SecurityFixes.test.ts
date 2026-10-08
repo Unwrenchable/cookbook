@@ -125,7 +125,7 @@ describe("Security fixes", function () {
 
     it("rejects the factory itself as fee recipient", async function () {
       await expect(
-        factory.connect(owner).setFeeRecipient(await factory.getAddress())
+        factory.connect(owner).queueSetFeeRecipient(await factory.getAddress())
       ).to.be.revertedWith("TokenFactory: recipient is factory");
     });
 
@@ -165,7 +165,11 @@ describe("Security fixes", function () {
       const sink = await Sink.deploy();
       await sink.waitForDeployment();
       await sink.setFactory(await factory.getAddress());
-      await factory.connect(owner).setFeeRecipient(await sink.getAddress());
+      const queued = await factory.connect(owner).queueSetFeeRecipient(await sink.getAddress());
+      const receipt = await queued.wait();
+      const eta = receipt!.logs.find((l: any) => l.fragment?.name === "AdminOpQueued").args.eta as bigint;
+      await time.increaseTo(eta);
+      await factory.executeSetFeeRecipient(await sink.getAddress(), eta);
 
       const token = await create();
       expect(token).to.not.equal(ethers.ZeroAddress);
@@ -394,11 +398,18 @@ describe("Security fixes", function () {
       expect(await token.virtualTokenReserve()).to.equal(1_000_000n);
 
       await token.connect(user1).setGraduationThreshold(ethers.parseEther("1"));
+      const EarlyRouter = await ethers.getContractFactory("MockUniswapV2Router");
+      const earlyRouter = await EarlyRouter.deploy();
+      await earlyRouter.waitForDeployment();
       await token.connect(user2).buy(1, { value: ethers.parseEther("0.05") });
       expect(await token.isGraduated()).to.equal(false);
       await expect(
         token.connect(user1).setGraduationThreshold(1n)
       ).to.be.revertedWith("PumpMigrateToken: trading already started");
+      await token.connect(user1).setDexRouter(await earlyRouter.getAddress());
+      await expect(token.connect(user1).setDexRouter(user2.address)).to.be.revertedWith(
+        "PumpMigrateToken: router locked"
+      );
 
       const graduatedAddress = await create({
         flavor: TokenFlavor.PumpMigrate,
@@ -407,22 +418,58 @@ describe("Security fixes", function () {
         marketingWallet: user3.address,
       });
       const graduated = await ethers.getContractAt("PumpMigrateToken", graduatedAddress);
+      const Router = await ethers.getContractFactory("MockUniswapV2Router");
+      const router = await Router.deploy();
+      await router.waitForDeployment();
+      await graduated.connect(user1).setDexRouter(await router.getAddress());
       await graduated.connect(user2).buy(1, { value: ethers.parseEther("0.05") });
       expect(await graduated.isGraduated()).to.equal(true);
+      expect(await graduated.liquidityMigrated()).to.equal(true);
+      expect(await graduated.ethReserve()).to.equal(0n);
+      expect(await ethers.provider.getBalance(graduatedAddress)).to.equal(0n);
+      expect(await router.balanceOf(await graduated.LP_BURN_ADDRESS())).to.be.gt(0n);
       await expect(graduated.connect(user2).sell(1n, 0)).to.be.revertedWith(
         "PumpMigrateToken: trading paused (graduating)"
       );
+      await expect(graduated.connect(user1).setDexRouter(user1.address)).to.be.revertedWith(
+        "PumpMigrateToken: already graduated"
+      );
+    });
 
-      await time.increase(24 * 60 * 60 + 1);
-      await expect(
-        graduated.connect(user2).resumeTrading(user2.address)
-      ).to.be.revertedWith("PumpMigrateToken: only owner sets pair");
-      await graduated.connect(user2).resumeTrading(ethers.ZeroAddress);
-      expect(await graduated.tradingPaused()).to.equal(false);
+    it("reverts graduation when the router misses the ETH minimum", async function () {
+      const tokenAddress = await create({
+        flavor: TokenFlavor.PumpMigrate,
+        totalSupply: ethers.parseEther("0.01"),
+        buyTaxBps: 100,
+        marketingWallet: user3.address,
+      });
+      const token = await ethers.getContractAt("PumpMigrateToken", tokenAddress);
+      const Router = await ethers.getContractFactory("MockUniswapV2Router");
+      const router = await Router.deploy();
+      await router.waitForDeployment();
+      await router.setShortEth(true);
+      await token.connect(user1).setDexRouter(await router.getAddress());
+      await expect(token.connect(user2).buy(1, { value: ethers.parseEther("0.05") })).to.be.revertedWith(
+        "MockRouter: eth slippage"
+      );
+      expect(await token.isGraduated()).to.equal(false);
+      expect(await token.ethReserve()).to.equal(0n);
+    });
 
-      const left = await graduated.balanceOf(user2.address);
-      await graduated.connect(user2).sell(left, 0);
-      expect(await ethers.provider.getBalance(graduatedAddress)).to.equal(await graduated.ethReserve());
+    it("rolls back a graduating buy when the router was never set", async function () {
+      const tokenAddress = await create({
+        flavor: TokenFlavor.PumpMigrate,
+        totalSupply: ethers.parseEther("0.01"),
+        buyTaxBps: 100,
+        marketingWallet: user3.address,
+      });
+      const token = await ethers.getContractAt("PumpMigrateToken", tokenAddress);
+      await expect(token.connect(user2).buy(1, { value: ethers.parseEther("0.05") })).to.be.revertedWith(
+        "PumpMigrateToken: router not set"
+      );
+      expect(await token.isGraduated()).to.equal(false);
+      expect(await token.ethReserve()).to.equal(0n);
+      expect(await token.tradingPaused()).to.equal(false);
     });
   });
 
@@ -548,22 +595,26 @@ describe("Security fixes", function () {
       return args.extra ? ethers.concat([body, args.extra]) : body;
     }
 
-    it("mints once for an exact payload and rejects replays, padding, and wildcard targets", async function () {
+    it("mints once for a verified VAA and rejects bad signatures, emitters, replays, and malformed payloads", async function () {
+      const Core = await ethers.getContractFactory("MockWormholeCore");
+      const core = await Core.deploy();
+      await core.waitForDeployment();
+
       const Token = await ethers.getContractFactory("BridgeMintableToken");
       const bridged = await Token.deploy("Bridged", "BRG", 18, owner.address);
       await bridged.waitForDeployment();
 
+      const emitter = ethers.id("solana-emitter");
       const Receiver = await ethers.getContractFactory("BurnBridgeReceiver");
       const receiver = await Receiver.deploy(
         2,
-        user3.address,
-        ethers.ZeroHash,
+        await core.getAddress(),
+        emitter,
         await bridged.getAddress(),
         1_000_000_000n
       );
       await receiver.waitForDeployment();
       await bridged.connect(owner).setMinter(await receiver.getAddress());
-      await receiver.connect(owner).setTrustedRelayer(user1.address, true);
 
       await expect(bridged.connect(user1).mint(user2.address, 1n)).to.be.revertedWithCustomError(
         bridged,
@@ -576,36 +627,195 @@ describe("Security fixes", function () {
         chainId: 2,
         nonce: 1n,
       });
-      await receiver.connect(user1).receiveRelayedMessage(message);
+      await core.configure(true, 1, emitter, 1, message);
+      await receiver.connect(user2).receiveMessage(message);
       expect(await bridged.balanceOf(user2.address)).to.equal(5n * 1_000_000_000n);
 
-      await expect(receiver.connect(user1).receiveRelayedMessage(message)).to.be.revertedWith(
+      await expect(receiver.connect(user1).receiveMessage(message)).to.be.revertedWith(
         "BurnBridgeReceiver: already processed"
       );
-      await expect(
-        receiver.connect(user1).receiveRelayedMessage(
-          payload({ recipient: user2.address, amount: 5n, chainId: 2, nonce: 1n, extra: "0x01" })
-        )
-      ).to.be.revertedWith("BurnBridgeReceiver: bad payload length");
-      await expect(
-        receiver.connect(user1).receiveRelayedMessage(
-          payload({ recipient: user2.address, amount: 5n, chainId: 4, nonce: 2n })
-        )
-      ).to.be.revertedWith("BurnBridgeReceiver: wrong target chain");
-      await expect(
-        receiver.connect(user1).receiveRelayedMessage(
-          payload({ recipient: user2.address, amount: 5n, chainId: 0, nonce: 3n })
-        )
-      ).to.be.revertedWith("BurnBridgeReceiver: wildcard target disabled");
-      await expect(receiver.connect(user2).receiveRelayedMessage(message)).to.be.revertedWith(
-        "BurnBridgeReceiver: not a trusted relayer"
+
+      const padded = payload({
+        recipient: user2.address,
+        amount: 5n,
+        chainId: 2,
+        nonce: 1n,
+        extra: "0x01",
+      });
+      await core.configure(true, 1, emitter, 2, padded);
+      await expect(receiver.receiveMessage(padded)).to.be.revertedWith(
+        "BurnBridgeReceiver: bad payload length"
       );
 
-      await receiver.connect(owner).setAcceptWildcardTarget(true);
-      await receiver.connect(user1).receiveRelayedMessage(
-        payload({ recipient: user3.address, amount: 2n, chainId: 0, nonce: 4n })
+      const badSig = payload({ recipient: user2.address, amount: 1n, chainId: 2, nonce: 8n });
+      await core.configure(false, 1, emitter, 8, badSig);
+      await expect(receiver.receiveMessage(badSig)).to.be.revertedWith("BurnBridgeReceiver: invalid VAA");
+
+      const wrongEmitter = payload({ recipient: user2.address, amount: 1n, chainId: 2, nonce: 9n });
+      await core.configure(true, 1, ethers.id("other-emitter"), 9, wrongEmitter);
+      await expect(receiver.receiveMessage(wrongEmitter)).to.be.revertedWith(
+        "BurnBridgeReceiver: emitter not allowed"
       );
+
+      const sameSequence = payload({ recipient: user2.address, amount: 1n, chainId: 2, nonce: 10n });
+      await core.configure(true, 1, emitter, 1, sameSequence);
+      await expect(receiver.receiveMessage(sameSequence)).to.be.revertedWith(
+        "BurnBridgeReceiver: sequence used"
+      );
+
+      const wrongChain = payload({ recipient: user2.address, amount: 5n, chainId: 4, nonce: 2n });
+      await core.configure(true, 1, emitter, 11, wrongChain);
+      await expect(receiver.receiveMessage(wrongChain)).to.be.revertedWith(
+        "BurnBridgeReceiver: wrong target chain"
+      );
+
+      const wildcard = payload({ recipient: user2.address, amount: 2n, chainId: 0, nonce: 3n });
+      await core.configure(true, 1, emitter, 12, wildcard);
+      await expect(receiver.receiveMessage(wildcard)).to.be.revertedWith(
+        "BurnBridgeReceiver: wildcard target disabled"
+      );
+
+      const zeroAmount = payload({ recipient: user2.address, amount: 0n, chainId: 2, nonce: 13n });
+      await core.configure(true, 1, emitter, 13, zeroAmount);
+      await expect(receiver.receiveMessage(zeroAmount)).to.be.revertedWith(
+        "BurnBridgeReceiver: zero amount"
+      );
+
+      const queued = await receiver.connect(owner).queueSetAcceptWildcardTarget(true);
+      const receipt = await queued.wait();
+      const eta = receipt!.logs.find((l: any) => l.fragment?.name === "AdminOpQueued").args.eta as bigint;
+      await expect(receiver.executeSetAcceptWildcardTarget(true, eta)).to.be.revertedWith(
+        "DelayedAdmin: too early"
+      );
+      await time.increaseTo(eta);
+      await receiver.executeSetAcceptWildcardTarget(true, eta);
+
+      const allowed = payload({ recipient: user3.address, amount: 2n, chainId: 0, nonce: 4n });
+      await core.configure(true, 1, emitter, 14, allowed);
+      await receiver.receiveMessage(allowed);
       expect(await bridged.balanceOf(user3.address)).to.equal(2n * 1_000_000_000n);
+    });
+  });
+
+  describe("admin delay and fee cap", function () {
+    it("caps the flat launch fee and changes the delay only through the queue", async function () {
+      await expect(
+        factory.connect(owner).queueSetLaunchFee(ethers.parseEther("1") + 1n)
+      ).to.be.revertedWith("TokenFactory: fee too high");
+
+      const queued = await factory.connect(owner).queueSetLaunchFee(ethers.parseEther("0.01"));
+      const receipt = await queued.wait();
+      const queuedLog = receipt!.logs.find((l: any) => l.fragment?.name === "AdminOpQueued");
+      const eta = queuedLog.args.eta as bigint;
+      const opId = queuedLog.args.opId as string;
+      await factory.connect(owner).cancelAdminOp(opId);
+      await time.increaseTo(eta);
+      await expect(
+        factory.executeSetLaunchFee(ethers.parseEther("0.01"), eta)
+      ).to.be.revertedWith("DelayedAdmin: not queued");
+
+      await expect(factory.connect(owner).queueSetAdminDelay(30 * 60)).to.be.revertedWith(
+        "DelayedAdmin: delay"
+      );
+      const delayTx = await factory.connect(owner).queueSetAdminDelay(2 * 60 * 60);
+      const delayReceipt = await delayTx.wait();
+      const delayEta = delayReceipt!.logs.find((l: any) => l.fragment?.name === "AdminOpQueued").args.eta as bigint;
+      await expect(factory.executeSetAdminDelay(2 * 60 * 60, delayEta)).to.be.revertedWith(
+        "DelayedAdmin: too early"
+      );
+      await time.increaseTo(delayEta);
+      await factory.executeSetAdminDelay(2 * 60 * 60, delayEta);
+      expect(await factory.adminDelay()).to.equal(2n * 60n * 60n);
+
+      const addresses = await Promise.all(impls.map((c) => c.getAddress()));
+      const Factory = await ethers.getContractFactory("TokenFactory");
+      await expect(
+        Factory.deploy(...addresses, ethers.parseEther("2"), feeRecipient.address)
+      ).to.be.revertedWith("TokenFactory: fee too high");
+
+      const atCap = await factory.connect(owner).queueSetLaunchFee(ethers.parseEther("1"));
+      const capReceipt = await atCap.wait();
+      const capEta = capReceipt!.logs.find((l: any) => l.fragment?.name === "AdminOpQueued").args.eta as bigint;
+      await time.increaseTo(capEta);
+      await expect(factory.executeSetLaunchFee(ethers.parseEther("1"), capEta))
+        .to.emit(factory, "LaunchFeeUpdated")
+        .withArgs(ethers.parseEther("1"));
+      expect(await factory.launchFee()).to.equal(ethers.parseEther("1"));
+
+      await expect(factory.connect(owner).queueSetReferralShareBps(5001)).to.be.revertedWith(
+        "TokenFactory: referral share too high"
+      );
+      await expect(
+        factory.connect(user1).createToken(params({ buyTaxBps: 2000, sellTaxBps: 1001 }), { value: ethers.parseEther("1") })
+      ).to.be.revertedWith("TokenFactory: total fees exceed 30 %");
+    });
+
+    it("rejects token fee parameters above the hard caps", async function () {
+      const taxable = await ethers.getContractAt(
+        "TaxableERC20",
+        await create({
+          flavor: TokenFlavor.Taxable,
+          buyTaxBps: 100,
+          sellTaxBps: 100,
+          marketingWallet: user2.address,
+        })
+      );
+      await expect(taxable.connect(user1).setTax(2501, 0)).to.be.revertedWith("TaxableERC20: buy tax > 25 %");
+      await expect(taxable.connect(user1).setTax(2500, 2500)).to.emit(taxable, "TaxUpdated").withArgs(2500, 2500);
+
+      const deflationary = await ethers.getContractAt(
+        "DeflationaryERC20",
+        await create({ flavor: TokenFlavor.Deflationary, burnBps: 100 })
+      );
+      await expect(deflationary.connect(user1).setBurnBps(1001)).to.be.revertedWith(
+        "DeflationaryERC20: burn > 10 %"
+      );
+      await expect(deflationary.connect(user1).setBurnBps(1000)).to.emit(deflationary, "BurnBpsUpdated").withArgs(1000);
+
+      const reflection = await ethers.getContractAt(
+        "ReflectionERC20",
+        await create({ flavor: TokenFlavor.Reflection, reflectionBps: 100 })
+      );
+      await expect(reflection.connect(user1).setReflectionBps(1001)).to.be.revertedWith(
+        "ReflectionERC20: reflection > 10 %"
+      );
+
+      const utility = await ethers.getContractAt(
+        "UtilityHybridToken",
+        await create({ flavor: TokenFlavor.UtilityHybrid, buyTaxBps: 100, burnBps: 100 })
+      );
+      await expect(utility.connect(user1).setRewardRate(501)).to.be.revertedWith(
+        "UtilityHybridToken: reward > 5 %/day"
+      );
+      await expect(utility.connect(user1).setBurnBps(501)).to.be.revertedWith("UtilityHybridToken: burn > 5 %");
+      await expect(utility.connect(user1).setBurnBps(500)).to.emit(utility, "BurnBpsUpdated").withArgs(500);
+
+      const agent = await ethers.getContractAt(
+        "AIAgentToken",
+        await create({ flavor: TokenFlavor.AIAgent, burnBps: 100, marketingWallet: user2.address })
+      );
+      await expect(agent.connect(user1).setAgentBurnCap(501)).to.be.revertedWith(
+        "AIAgentToken: burn cap > 5 %/day"
+      );
+      await expect(agent.connect(user1).setAgentBurnCap(500)).to.emit(agent, "AgentBurnCapUpdated").withArgs(500);
+
+      await create({
+        flavor: TokenFlavor.PumpMigrate,
+        totalSupply: ethers.parseEther("1"),
+        buyTaxBps: 300,
+        marketingWallet: user2.address,
+      });
+      await expect(
+        factory.connect(user1).createToken(
+          params({
+            flavor: TokenFlavor.PumpMigrate,
+            totalSupply: ethers.parseEther("1"),
+            buyTaxBps: 301,
+            marketingWallet: user2.address,
+          }),
+          { value: LAUNCH_FEE }
+        )
+      ).to.be.revertedWith("TokenFactory: initialization failed");
     });
   });
 });
