@@ -155,6 +155,7 @@ cd contracts/evm
 # 1) Configure secrets
 cp .env.example .env
 # Fill PRIVATE_KEY + SOLANA_EMITTER (+ optional explorer keys and RPC overrides)
+# SOLANA_EMITTER is the ["emitter"] PDA from `pnpm emitter <programId>`, not the program id
 
 # 2) Compile once
 pnpm compile
@@ -164,7 +165,7 @@ pnpm preflight:sepolia
 # or: pnpm preflight:bscTestnet | preflight:polygonAmoy | preflight:arbitrumSepolia | preflight:baseSepolia | preflight:optimismSepolia
 
 # 4) Deploy implementations, factory, locker, bridge, and (where needed) the pinned testnet DEX
-SOLANA_EMITTER=0xYourRotatedProgramId pnpm deploy:sepolia
+SOLANA_EMITTER=0xYourEmitterPda pnpm deploy:sepolia
 ```
 
 The same script deploys the pinned Uniswap V2 bytecode on `polygonAmoy`, `arbitrumSepolia`, `baseSepolia`, and `optimismSepolia`. Mainnet commands require the flags in `docs/MAINNET_CHECKLIST.md`. Chain TVL and DEX volume for what was kept and what was rejected are in `docs/CHAIN_SUPPORT.md`.
@@ -205,7 +206,7 @@ POLYGONSCAN_API_KEY=...
 ARBISCAN_API_KEY=...
 BASESCAN_API_KEY=...
 # BurnBridgeReceiver
-SOLANA_EMITTER=0x...       # token-burn-bridge program ID as bytes32 hex
+SOLANA_EMITTER=0x...       # token-burn-bridge ["emitter"] PDA as bytes32 hex
 MINTABLE_TOKEN_SEPOLIA=0x...
 MINTABLE_TOKEN_BSCTESTNET=0x...
 MINTABLE_TOKEN_POLYGONAMOY=0x...

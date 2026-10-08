@@ -60,6 +60,7 @@ async function main() {
 
   const [deployer] = await ethers.getSigners();
   const feeRecipient = (process.env.FEE_RECIPIENT?.trim() || (spec.isMainnet ? "" : deployer.address));
+  // ["emitter"] PDA as bytes32, from `pnpm emitter <programId>`. Not the program id.
   const emitter = normalizeEmitter(process.env.SOLANA_EMITTER);
   assertBroadcastAllowed({
     networkName: spec.name,

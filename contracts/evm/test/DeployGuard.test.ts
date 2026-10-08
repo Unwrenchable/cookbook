@@ -1,10 +1,14 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
+import { PublicKey } from "@solana/web3.js";
 import {
   assertBroadcastAllowed,
   LEAKED_SOLANA_EMITTER,
+  LEAKED_SOLANA_EMITTER_PDA,
+  LEAKED_SOLANA_PROGRAM_ID,
   MAINNET_CONFIRM,
   normalizeEmitter,
+  pubkeyToHex,
 } from "../scripts/mainnetGuard";
 
 describe("deploy broadcast guard", function () {
@@ -63,6 +67,24 @@ describe("deploy broadcast guard", function () {
     expect(() => assertBroadcastAllowed({ ...base, feeRecipient: deployer })).to.throw(/multisig/);
     expect(() => assertBroadcastAllowed({ ...base, feeRecipient: ethers.ZeroAddress })).to.throw(/FEE_RECIPIENT/);
     expect(() => assertBroadcastAllowed(base)).to.not.throw();
+  });
+
+  it("rejects the emitter PDA derived from the leaked program id", function () {
+    const programId = new PublicKey(LEAKED_SOLANA_PROGRAM_ID);
+    const [pda] = PublicKey.findProgramAddressSync([Buffer.from("emitter")], programId);
+    const derived = pubkeyToHex(pda);
+    expect(pubkeyToHex(programId)).to.equal(LEAKED_SOLANA_EMITTER);
+    expect(derived).to.equal(LEAKED_SOLANA_EMITTER_PDA);
+    expect(derived).to.not.equal(LEAKED_SOLANA_EMITTER);
+    expect(() =>
+      assertBroadcastAllowed({
+        networkName: "sepolia",
+        isMainnet: false,
+        emitter: derived,
+        feeRecipient: deployer,
+        deployer,
+      })
+    ).to.throw(/emitter PDA/);
   });
 
   it("left-pads a short emitter to 32 bytes", function () {

@@ -24,7 +24,8 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard, DelayedAdmin {
 
     uint16 public immutable thisChainId;
 
-    /// Primary Solana emitter recorded at deploy. Further emitters go through the timelock.
+    /// Primary Solana emitter recorded at deploy. This is the burn-bridge
+    /// ["emitter"] PDA, not the program id. Further emitters go through the timelock.
     bytes32 public trustedSolanaEmitter;
 
     address public mintableToken;
