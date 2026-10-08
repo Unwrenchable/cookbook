@@ -49,7 +49,16 @@
       "hono": "4.12.12",
       "axios": "^1.15.0",
       "lodash": "^4.18.1",
-      "serialize-javascript": "^7.0.5"
+      "serialize-javascript": "^7.0.5",
+      "shell-quote": "1.12.0",
+      "protobufjs@<7.5.5": "7.6.6",
+      "js-yaml@3.14.2": "3.15.2",
+      "js-yaml@4.1.1": "4.3.2",
+      "brace-expansion@1.1.13": "1.1.21",
+      "brace-expansion@2.1.0": "2.1.7",
+      "brace-expansion@2.1.1": "2.1.7",
+      "brace-expansion@5.0.5": "5.0.12",
+      "postcss@<8.5.29": "8.5.29"
     },
     "peerDependencyRules": {
       "ignoreMissing": [
