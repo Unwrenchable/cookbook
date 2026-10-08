@@ -428,6 +428,28 @@ describe("token-burn-bridge", () => {
       expect(poly?.isActive).to.be.false;
     });
 
+    it("rejects a burn to a deactivated chain", async () => {
+      const evmRecipient = hexToBytes20("0x1111111111111111111111111111111111111111");
+      try {
+        await program.methods
+          .burnAndBridge(MIN_BURN_ONE_CHAIN, CHAIN_POLYGON, evmRecipient, 1)
+          .accounts({
+            config:           configPda,
+            tokenMint:        mint,
+            userTokenAccount: user2TokenAccount,
+            userNonce:        user2NoncePda,
+            user:             user2.publicKey,
+            tokenProgram:     TOKEN_PROGRAM_ID,
+            systemProgram:    SystemProgram.programId,
+          })
+          .signers([user2])
+          .rpc();
+        expect.fail("Expected UnsupportedChain error");
+      } catch (err: any) {
+        expect(err.error?.errorCode?.code ?? err.toString()).to.include("UnsupportedChain");
+      }
+    });
+
     it("rejects updateReceivers from non-authority", async () => {
       try {
         await program.methods
@@ -500,6 +522,48 @@ describe("token-burn-bridge", () => {
         .rpc();
       const { amount: after } = await getAccount(connection, user2TokenAccount);
       expect((before - after).toString()).to.equal(MIN_BURN_ONE_CHAIN.toString());
+    });
+
+    it("rejects chain_id 0 below MIN_BURN_ALL_CHAINS", async () => {
+      try {
+        await program.methods
+          .burnAndBridge(MIN_BURN_ONE_CHAIN, 0, evmRecipient, 1)
+          .accounts({
+            config:           configPda,
+            tokenMint:        mint,
+            userTokenAccount: user2TokenAccount,
+            userNonce:        user2NoncePda,
+            user:             user2.publicKey,
+            tokenProgram:     TOKEN_PROGRAM_ID,
+            systemProgram:    SystemProgram.programId,
+          })
+          .signers([user2])
+          .rpc();
+        expect.fail("Expected BurnTooSmall error");
+      } catch (err: any) {
+        expect(err.error?.errorCode?.code ?? err.toString()).to.include("BurnTooSmall");
+      }
+    });
+
+    it("rejects the zero EVM recipient", async () => {
+      try {
+        await program.methods
+          .burnAndBridge(MIN_BURN_ONE_CHAIN, CHAIN_BSC, Array.from({ length: 20 }, () => 0), 1)
+          .accounts({
+            config:           configPda,
+            tokenMint:        mint,
+            userTokenAccount: user2TokenAccount,
+            userNonce:        user2NoncePda,
+            user:             user2.publicKey,
+            tokenProgram:     TOKEN_PROGRAM_ID,
+            systemProgram:    SystemProgram.programId,
+          })
+          .signers([user2])
+          .rpc();
+        expect.fail("Expected ZeroRecipient error");
+      } catch (err: any) {
+        expect(err.error?.errorCode?.code ?? err.toString()).to.include("ZeroRecipient");
+      }
     });
 
     it("accepts exactly MIN_BURN_ALL_CHAINS (1000 tokens) with chain_id=0", async () => {

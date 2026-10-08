@@ -19,9 +19,13 @@ contract TaxableERC20 is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     // Simple DEX detection: any address can be flagged as a DEX pair
     mapping(address => bool) public isDexPair;
 
+    /// @notice Once true, tax rates, DEX flags, and the marketing wallet are immutable.
+    bool public taxLocked;
+
     event DexPairSet(address indexed pair, bool value);
     event TaxUpdated(uint16 buyTaxBps, uint16 sellTaxBps);
     event MarketingWalletUpdated(address newWallet);
+    event TaxLocked();
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -84,11 +88,13 @@ contract TaxableERC20 is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     // ─── Owner controls ───────────────────────────────────────────────────────
 
     function setDexPair(address pair, bool value) external onlyOwner {
+        require(!taxLocked, "TaxableERC20: tax locked");
         isDexPair[pair] = value;
         emit DexPairSet(pair, value);
     }
 
     function setTax(uint16 _buyTaxBps, uint16 _sellTaxBps) external onlyOwner {
+        require(!taxLocked, "TaxableERC20: tax locked");
         require(_buyTaxBps  <= 2500, "TaxableERC20: buy tax > 25 %");
         require(_sellTaxBps <= 2500, "TaxableERC20: sell tax > 25 %");
         buyTaxBps  = _buyTaxBps;
@@ -97,8 +103,15 @@ contract TaxableERC20 is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     }
 
     function setMarketingWallet(address wallet) external onlyOwner {
+        require(!taxLocked, "TaxableERC20: tax locked");
         require(wallet != address(0), "TaxableERC20: zero wallet");
         marketingWallet = wallet;
         emit MarketingWalletUpdated(wallet);
+    }
+
+    /// @notice Permanently freeze tax configuration. This is the trust step comparable launchpads expose in the UI.
+    function lockTax() external onlyOwner {
+        taxLocked = true;
+        emit TaxLocked();
     }
 }

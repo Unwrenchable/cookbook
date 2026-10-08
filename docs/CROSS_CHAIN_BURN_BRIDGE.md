@@ -13,7 +13,9 @@ This creates a unique multi-chain token economics model where:
 >
 > The Solana Anchor program emits a `BurnMessageEmitted` event but does **not yet CPI into the Wormhole `post_message` instruction**. On the EVM side, `BurnBridgeReceiver.receiveMessage()` currently **reverts** — it is a scaffold pending full Wormhole VAA integration.
 >
-> For development and integration testing, use `BurnBridgeReceiver.receiveRelayedMessage()` together with a trusted off-chain relayer that decodes the Anchor event and submits the payload + replay key.
+> For development and integration testing, use `BurnBridgeReceiver.receiveRelayedMessage()` together with a trusted off-chain relayer that decodes the Anchor event and submits the payload.
+>
+> Payload length is **exactly 114 bytes**. Longer payloads are rejected so trailing bytes cannot mint the same burn twice. `targetChainId == 0` does **not** mint unless the receiver owner has called `setAcceptWildcardTarget(true)` — otherwise one Solana burn would mint on every chain. The mintable asset is `BridgeMintableToken`, and only its configured minter (the receiver) can mint.
 >
 > To complete the production bridge, two tasks remain:
 > 1. Add the Wormhole `post_message` CPI call to the Anchor program's `burn_and_bridge` instruction.

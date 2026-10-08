@@ -46,6 +46,10 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
     /// Trusted off-chain relayers
     mapping(address => bool) public isTrustedRelayer;
 
+    /// When false, targetChainId 0 cannot mint on this chain.
+    /// A single Solana burn with target 0 would otherwise mint on every receiver.
+    bool public acceptWildcardTarget;
+
     // ─── Events ───────────────────────────────────────────────────────────────
 
     event TokensActivated(
@@ -61,6 +65,7 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
     event MintRatioUpdated(uint256 ratio);
     event WormholeCoreUpdated(address core);
     event TrustedEmitterUpdated(bytes32 emitter);
+    event WildcardTargetUpdated(bool enabled);
 
     // ─── Constructor ──────────────────────────────────────────────────────────
 
@@ -111,7 +116,9 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
     // ─── Internal ─────────────────────────────────────────────────────────────
 
     function _processPayload(bytes calldata payload) internal {
-        require(payload.length >= 114, "BurnBridgeReceiver: payload too short");
+        // Exact length: extra trailing bytes used to change keccak256(payload)
+        // while parsing the same fields, which bypassed replay protection.
+        require(payload.length == 114, "BurnBridgeReceiver: bad payload length");
 
         bytes32 solanaSourceMint;
         bytes32 solanaSender;
@@ -144,7 +151,11 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
         }
 
         require(evmRecipient != address(0), "BurnBridgeReceiver: zero recipient");
-        require(targetChainId == thisChainId || targetChainId == 0, "BurnBridgeReceiver: wrong target chain");
+        if (targetChainId == 0) {
+            require(acceptWildcardTarget, "BurnBridgeReceiver: wildcard target disabled");
+        } else {
+            require(targetChainId == thisChainId, "BurnBridgeReceiver: wrong target chain");
+        }
 
         uint256 mintAmount = uint256(amountBurned) * mintRatio;
         require(mintAmount > 0, "BurnBridgeReceiver: zero mint amount");
@@ -188,5 +199,10 @@ contract BurnBridgeReceiver is Ownable, ReentrancyGuard {
     function setTrustedSolanaEmitter(bytes32 emitter) external onlyOwner {
         trustedSolanaEmitter = emitter;
         emit TrustedEmitterUpdated(emitter);
+    }
+
+    function setAcceptWildcardTarget(bool enabled) external onlyOwner {
+        acceptWildcardTarget = enabled;
+        emit WildcardTargetUpdated(enabled);
     }
 }

@@ -43,6 +43,8 @@ contract PolitiFiToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     mapping(address => Side)    public holderSide;
     mapping(address => bool)    public hasClaimed;
     mapping(address => uint256) public sideBalanceSnapshot; // balance at cutoff
+    mapping(address => bool)    public snapshotted;
+    mapping(address => bool)    public loserBurnApplied;
 
     bool public cutoffReached;
 
@@ -52,6 +54,7 @@ contract PolitiFiToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     event WinnerClaimed(address indexed winner, uint256 prize);
     event EventCancelled();
     event CutoffReached(uint256 totalYes, uint256 totalNo, uint256 prizePool);
+    event LoserBurned(address indexed holder, uint256 amount);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() { _disableInitializers(); }
@@ -108,16 +111,26 @@ contract PolitiFiToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     function lockCutoff(address[] calldata holders) external onlyOwner {
         require(!cutoffReached,          "PolitiFiToken: already locked");
         require(outcome == Outcome.Pending, "PolitiFiToken: already resolved");
+        require(holders.length > 0 && holders.length <= 200, "PolitiFiToken: bad holder list");
 
         cutoffReached = true;
         for (uint256 i = 0; i < holders.length; i++) {
-            address h = holders[i];
-            uint256 bal = balanceOf(h);
-            sideBalanceSnapshot[h] = bal;
-            if (holderSide[h] == Side.Yes) totalYesBalance += bal;
-            else if (holderSide[h] == Side.No) totalNoBalance += bal;
+            _snapshot(holders[i]);
         }
+        require(totalYesBalance + totalNoBalance > 0, "PolitiFiToken: nobody snapshotted");
         emit CutoffReached(totalYesBalance, totalNoBalance, prizePool);
+    }
+
+    function _snapshot(address holder) internal {
+        if (snapshotted[holder]) return;
+        Side side = holderSide[holder];
+        if (side != Side.Yes && side != Side.No) return;
+        snapshotted[holder] = true;
+        uint256 bal = balanceOf(holder);
+        sideBalanceSnapshot[holder] = bal;
+        if (bal == 0) return;
+        if (side == Side.Yes) totalYesBalance += bal;
+        else totalNoBalance += bal;
     }
 
     /**
@@ -127,11 +140,30 @@ contract PolitiFiToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     function resolve(bool yesWon) external onlyOwner {
         require(cutoffReached,              "PolitiFiToken: cutoff not locked");
         require(outcome == Outcome.Pending, "PolitiFiToken: already resolved");
-        require(block.timestamp >= resolutionTime || msg.sender == owner(),
-                "PolitiFiToken: too early");
+        require(block.timestamp >= resolutionTime, "PolitiFiToken: too early");
 
         outcome = yesWon ? Outcome.Yes : Outcome.No;
         emit EventResolved(outcome);
+    }
+
+    /**
+     * @notice Burn loserBurnBps of a losing holder's balance.
+     *         Permissionless so resolution does not need an unbounded loop.
+     *         Transfers by that holder are blocked until this runs.
+     */
+    function applyLoserBurn(address holder) external {
+        require(outcome == Outcome.Yes || outcome == Outcome.No, "PolitiFiToken: not resolved");
+        require(!loserBurnApplied[holder], "PolitiFiToken: already burned");
+        Side losingSide = outcome == Outcome.Yes ? Side.No : Side.Yes;
+        require(holderSide[holder] == losingSide, "PolitiFiToken: not a loser");
+
+        loserBurnApplied[holder] = true;
+        uint256 bal = balanceOf(holder);
+        if (bal == 0 || loserBurnBps == 0) return;
+        uint256 burnAmount = (bal * loserBurnBps) / 10_000;
+        if (burnAmount == 0) return;
+        _burn(holder, burnAmount);
+        emit LoserBurned(holder, burnAmount);
     }
 
     /**
@@ -169,7 +201,29 @@ contract PolitiFiToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
     // ─── Fee on transfer → prize pool ────────────────────────────────────────
 
     function _update(address from, address to, uint256 amount) internal override {
-        if (from == address(0) || to == address(0) || predictionFeeBps == 0) {
+        if (
+            cutoffReached &&
+            outcome == Outcome.Pending &&
+            from != address(0) &&
+            to != address(0) &&
+            from != address(this)
+        ) {
+            revert("PolitiFiToken: transfers frozen until resolution");
+        }
+        if (
+            from != address(0) &&
+            to != address(0) &&
+            (outcome == Outcome.Yes || outcome == Outcome.No)
+        ) {
+            Side losingSide = outcome == Outcome.Yes ? Side.No : Side.Yes;
+            if (holderSide[from] == losingSide && !loserBurnApplied[from]) {
+                revert("PolitiFiToken: loser must burn before transfer");
+            }
+        }
+
+        // Prize payouts are transfers out of this contract. Taxing them again
+        // would skim the prize and desync prizePool from the token balance.
+        if (from == address(0) || to == address(0) || from == address(this) || predictionFeeBps == 0) {
             super._update(from, to, amount);
             return;
         }
@@ -187,6 +241,8 @@ contract PolitiFiToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
 
     function setEventMeta(string calldata name_, uint256 resolutionTime_) external onlyOwner {
         require(outcome == Outcome.Pending, "PolitiFiToken: already resolved");
+        require(!cutoffReached, "PolitiFiToken: cutoff passed");
+        require(resolutionTime_ > block.timestamp, "PolitiFiToken: resolution not in future");
         eventName      = name_;
         resolutionTime = resolutionTime_;
     }

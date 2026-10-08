@@ -34,7 +34,6 @@ const ALLOWED_METHODS = new Set([
   "getLatestBlockhash",
   "getMinimumBalanceForRentExemption",
   "getMultipleAccounts",
-  "getProgramAccounts",
   "getRecentBlockhash",
   "getRecentPerformanceSamples",
   "getSignatureStatuses",

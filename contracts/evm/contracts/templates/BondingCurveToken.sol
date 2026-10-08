@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "../libraries/LinearCurve.sol";
 
 /**
  * @title BondingCurveToken
@@ -85,10 +86,9 @@ contract BondingCurveToken is
      *         given current total supply.
      */
     function getBuyCost(uint256 amount) public view returns (uint256 cost) {
-        uint256 s = totalSupply();
-        // Integral of (basePrice + slope * x) from s to s+amount
-        // = basePrice * amount + slope * (amount * (2*s + amount)) / 2
-        cost = basePrice * amount + slope * (amount * (2 * s + amount)) / 2;
+        bool ok;
+        (ok, cost) = LinearCurve.tryCost(basePrice, slope, totalSupply(), amount);
+        require(ok, "BondingCurveToken: cost overflow");
     }
 
     /**
@@ -97,8 +97,9 @@ contract BondingCurveToken is
     function getSellRefund(uint256 amount) public view returns (uint256 refund) {
         uint256 s = totalSupply();
         if (amount > s) return 0;
-        // Integral from s-amount to s
-        refund = basePrice * amount + slope * (amount * (2 * (s - amount) + amount)) / 2;
+        bool ok;
+        (ok, refund) = LinearCurve.tryCost(basePrice, slope, s - amount, amount);
+        if (!ok) return 0;
         if (refund > ethReserve) refund = ethReserve;
     }
 
@@ -111,8 +112,7 @@ contract BondingCurveToken is
     function buy(uint256 minTokens) external payable nonReentrant {
         require(msg.value > 0, "BondingCurveToken: send ETH to buy");
 
-        // Binary-search for the number of tokens purchasable with msg.value
-        uint256 amount = _tokensForEth(msg.value);
+        uint256 amount = LinearCurve.tokensForEth(basePrice, slope, totalSupply(), msg.value);
         require(amount >= minTokens, "BondingCurveToken: slippage");
 
         uint256 cost = getBuyCost(amount);
@@ -154,28 +154,15 @@ contract BondingCurveToken is
     // ─── Admin ────────────────────────────────────────────────────────────────
 
     function setCurveParams(uint256 _basePrice, uint256 _slope) external onlyOwner {
+        // Changing the curve after buys lets the owner reprice other people's ETH.
+        require(totalSupply() == 0 && ethReserve == 0, "BondingCurveToken: curve locked");
         require(_basePrice > 0, "BondingCurveToken: zero base price");
         basePrice = _basePrice;
         slope     = _slope;
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
-
-    /**
-     * @dev Approximate number of tokens purchasable for `ethAmount` via binary search.
-     *      Avoids floating-point arithmetic.
-     */
-    function _tokensForEth(uint256 ethAmount) internal view returns (uint256) {
-        uint256 lo = 0;
-        uint256 hi = 10 ** 30; // upper bound
-        while (lo < hi) {
-            uint256 mid = (lo + hi + 1) / 2;
-            if (getBuyCost(mid) <= ethAmount) {
-                lo = mid;
-            } else {
-                hi = mid - 1;
-            }
-        }
-        return lo;
+    /// @dev Plain transfers would sit outside ethReserve and become unrecoverable.
+    receive() external payable {
+        revert("BondingCurveToken: use buy()");
     }
 }

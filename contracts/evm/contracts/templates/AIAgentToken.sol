@@ -96,6 +96,7 @@ contract AIAgentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
 
         agentDailyBurnUsed += amount;
         _burn(address(this), amount);
+        treasuryBalance = balanceOf(address(this));
         emit AgentAction(agentWallet, "autoBurn", amount, reason);
     }
 
@@ -119,6 +120,7 @@ contract AIAgentToken is Initializable, ERC20Upgradeable, OwnableUpgradeable {
                 _transfer(address(this), recipients[i], amounts[i]);
             }
         }
+        treasuryBalance = balanceOf(address(this));
         emit AgentAction(agentWallet, "autoRedistribute", total, reason);
     }
 

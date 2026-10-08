@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "../libraries/LinearCurve.sol";
 
 /**
  * @title PumpMigrateToken
@@ -14,7 +15,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
  * you hit the ETH threshold, auto-lock LP, then ride the CEX listing liquidity explosion.
  *
  * Flow:
- *  1. Token launches with a virtual ETH reserve (creates initial price).
+ *  1. Token launches with a virtual token reserve (a supply offset, not a wei balance).
  *  2. Users buy via `buy()` — price increases linearly with supply.
  *  3. When `ethReserve >= graduationThreshold` → `_graduate()` is triggered.
  *  4. Graduation: trading pauses for 24 h, emits `Graduated` event,
@@ -31,7 +32,10 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
     uint256 public basePrice;        // wei per raw token unit at zero supply
     uint256 public slope;            // wei increase per raw token unit minted
     uint256 public ethReserve;       // actual ETH in the curve
-    uint256 public virtualEthReserve; // virtual ETH (sets initial price)
+    /// @notice Deprecated. Retained so older readers do not mistake a wei value for token supply.
+    uint256 public virtualEthReserve;
+    /// @notice Virtual tokens already "sold", used only as the curve's supply offset.
+    uint256 public virtualTokenReserve;
 
     // ─── Graduation ───────────────────────────────────────────────────────────
     uint256 public graduationThreshold; // ETH needed to graduate (e.g. 0.085 ETH on L2, 85 ETH on mainnet)
@@ -105,8 +109,10 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
             ? graduationThresholdEth_
             : 85_000_000_000_000_000; // 0.085 ETH
 
-        // Bonding curve params (pump.fun inspired)
-        virtualEthReserve    = 30_000_000_000_000_000; // 0.03 ETH virtual (sets start price)
+        // Price offset is in token units. Adding wei (the old virtualEthReserve)
+        // to totalSupply() priced the first token at tens of ETH.
+        virtualEthReserve    = 0;
+        virtualTokenReserve  = 1_000_000;
         basePrice            = 1e9;    // ~1e-9 ETH per raw token at zero supply
         slope                = 1e3;
     }
@@ -118,26 +124,28 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
     function buy(uint256 minTokens) external payable nonReentrant notPaused {
         require(msg.value > 0, "PumpMigrateToken: send ETH");
 
-        uint256 fee       = (msg.value * tradingFeeBps) / 10_000;
-        uint256 ethIn     = msg.value - fee;
-        uint256 amount    = _tokensForEth(ethIn);
+        // Fee is charged on ETH the curve actually keeps, not on the refunded surplus.
+        uint256 budget = tradingFeeBps == 0
+            ? msg.value
+            : (msg.value * 10_000) / (10_000 + uint256(tradingFeeBps));
+        uint256 amount = LinearCurve.tokensForEth(basePrice, slope, _curveIndex(), budget);
+        require(amount > 0, "PumpMigrateToken: zero tokens");
         require(amount >= minTokens, "PumpMigrateToken: slippage");
-        require(amount > 0,          "PumpMigrateToken: zero tokens");
 
-        // Charge only the exact bonding-curve cost; refund unused ETH to buyer.
-        uint256 cost   = getBuyCost(amount);
-        uint256 excess = ethIn - cost;
+        uint256 cost = getBuyCost(amount);
+        uint256 fee = (cost * tradingFeeBps) / 10_000;
+        uint256 totalCharge = cost + fee;
+        require(totalCharge <= msg.value, "PumpMigrateToken: insufficient ETH");
 
         ethReserve += cost;
         _mint(msg.sender, amount);
 
-        // Forward fee
         if (fee > 0) {
             (bool sent,) = feeWallet.call{value: fee}("");
             require(sent, "PumpMigrateToken: fee failed");
         }
 
-        // Refund any ETH not consumed by the curve
+        uint256 excess = msg.value - totalCharge;
         if (excess > 0) {
             (bool ok,) = msg.sender.call{value: excess}("");
             require(ok, "PumpMigrateToken: refund failed");
@@ -145,7 +153,6 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
 
         emit Buy(msg.sender, amount, cost);
 
-        // Check graduation
         if (!isGraduated && ethReserve >= graduationThreshold) {
             _graduate();
         }
@@ -178,26 +185,21 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
     // ─── Curve math ───────────────────────────────────────────────────────────
 
     function getBuyCost(uint256 amount) public view returns (uint256) {
-        uint256 s = totalSupply() + virtualEthReserve; // virtual offset
-        return basePrice * amount + slope * (amount * (2 * s + amount)) / 2;
+        (bool ok, uint256 cost) = LinearCurve.tryCost(basePrice, slope, _curveIndex(), amount);
+        require(ok, "PumpMigrateToken: cost overflow");
+        return cost;
     }
 
     function getSellRefund(uint256 amount) public view returns (uint256) {
-        uint256 s = totalSupply() + virtualEthReserve;
         if (amount > totalSupply()) return 0;
-        uint256 refund = basePrice * amount + slope * (amount * (2 * (s - amount) + amount)) / 2;
+        uint256 index = _curveIndex();
+        (bool ok, uint256 refund) = LinearCurve.tryCost(basePrice, slope, index - amount, amount);
+        if (!ok) return 0;
         return refund > ethReserve ? ethReserve : refund;
     }
 
-    function _tokensForEth(uint256 ethAmount) internal view returns (uint256) {
-        uint256 lo = 0;
-        uint256 hi = 1e30;
-        while (lo < hi) {
-            uint256 mid = (lo + hi + 1) / 2;
-            if (getBuyCost(mid) <= ethAmount) lo = mid;
-            else hi = mid - 1;
-        }
-        return lo;
+    function _curveIndex() internal view returns (uint256) {
+        return totalSupply() + virtualTokenReserve;
     }
 
     // ─── Graduation ───────────────────────────────────────────────────────────
@@ -213,15 +215,23 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
      * @notice Resume trading after the pause window.
      *         Call after adding liquidity to a DEX.
      */
-    function resumeTrading(address pair) external onlyOwner {
+    /**
+     * @notice Resume curve trading after the pause.
+     *         The owner may record the DEX pair. Anyone may unpause once the
+     *         window has elapsed, so a missing admin call cannot freeze the reserve.
+     */
+    function resumeTrading(address pair) external {
         require(isGraduated,   "PumpMigrateToken: not graduated");
         require(tradingPaused, "PumpMigrateToken: not paused");
         require(
             block.timestamp >= graduatedAt + PAUSE_DURATION,
             "PumpMigrateToken: 24 h pause not elapsed"
         );
+        if (pair != address(0)) {
+            require(msg.sender == owner(), "PumpMigrateToken: only owner sets pair");
+            liquidityPair = pair;
+        }
         tradingPaused = false;
-        liquidityPair = pair;
         emit TradingResumed();
     }
 
@@ -254,6 +264,13 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
 
     function setGraduationThreshold(uint256 thresholdWei) external onlyOwner {
         require(!isGraduated, "PumpMigrateToken: already graduated");
+        require(ethReserve == 0, "PumpMigrateToken: trading already started");
+        require(thresholdWei > 0, "PumpMigrateToken: zero threshold");
         graduationThreshold = thresholdWei;
+    }
+
+    /// @dev Plain transfers would sit outside ethReserve and become unrecoverable.
+    receive() external payable {
+        revert("PumpMigrateToken: use buy()");
     }
 }

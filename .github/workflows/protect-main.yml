@@ -35,10 +35,9 @@ jobs:
                 // Require the frontend type-check CI to pass before merge.
                 required_status_checks: {
                   strict: false,
-                  // Must match the `jobs.<id>.name` in .github/workflows/ci.yml.
-                  // Job id is 'type-check'; the status check name registered by
-                  // GitHub Actions is the job name: 'type-check'.
-                  contexts: ['type-check'],
+                  // Must match the job id in .github/workflows/ci.yml.
+                  // That job is `quality` (lint, unit tests, compile, preflight).
+                  contexts: ['quality'],
                 },
                 // Do not enforce protection on admins so the owner can
                 // still merge emergency fixes without a review.

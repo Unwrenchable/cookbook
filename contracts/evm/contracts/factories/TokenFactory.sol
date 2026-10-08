@@ -110,6 +110,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         require(_utilityHybridImpl != address(0), "TokenFactory: zero utility hybrid impl");
         require(_pumpMigrateImpl   != address(0), "TokenFactory: zero pump migrate impl");
         require(_feeRecipient      != address(0), "TokenFactory: zero fee recipient");
+        require(_feeRecipient      != address(this), "TokenFactory: recipient is factory");
 
         standardImpl      = _standardImpl;
         taxableImpl       = _taxableImpl;
@@ -248,6 +249,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
 
     function setFeeRecipient(address _recipient) external onlyOwner {
         require(_recipient != address(0), "TokenFactory: zero recipient");
+        require(_recipient != address(this), "TokenFactory: recipient is factory");
         feeRecipient = _recipient;
         emit FeeRecipientUpdated(_recipient);
     }
@@ -268,7 +270,10 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     function _validateParams(TokenParams calldata params) internal pure {
         require(bytes(params.name).length > 0,   "TokenFactory: empty name");
         require(bytes(params.symbol).length > 0,  "TokenFactory: empty symbol");
+        require(bytes(params.name).length <= 64,  "TokenFactory: name too long");
+        require(bytes(params.symbol).length <= 16, "TokenFactory: symbol too long");
         require(params.totalSupply > 0,           "TokenFactory: zero supply");
+        require(params.decimals <= 18,            "TokenFactory: decimals > 18");
         require(params.owner != address(0),        "TokenFactory: zero owner");
         require(
             uint8(params.flavor) <= uint8(TokenFlavor.PumpMigrate),

@@ -104,18 +104,32 @@ pub mod token_burn_bridge {
         consistency_level: u8,
     ) -> Result<()> {
         // ── Validation ───────────────────────────────────────────────────────
-        require!(amount >= MIN_BURN_ONE_CHAIN, BridgeError::BurnTooSmall);
         require!(
             ctx.accounts.user_token_account.amount >= amount,
             BridgeError::InsufficientBalance
         );
+        require!(evm_recipient != [0u8; 20], BridgeError::ZeroRecipient);
 
         let config = &ctx.accounts.config;
 
-        // Validate target chain is supported (or 0 = all)
-        if target_chain_id != 0 {
+        // target_chain_id 0 broadcasts to every active receiver and therefore
+        // requires the all-chains tier. A single chain only requires the
+        // one-chain minimum, and inactive receivers are rejected.
+        // The documented "three chains" tier is not a separate instruction:
+        // this call carries one target, so 500 tokens still activates one chain.
+        if target_chain_id == 0 {
+            require!(amount >= MIN_BURN_ALL_CHAINS, BridgeError::BurnTooSmall);
             require!(
-                config.evm_receivers.iter().any(|r| r.chain_id == target_chain_id),
+                config.evm_receivers.iter().any(|r| r.is_active),
+                BridgeError::UnsupportedChain
+            );
+        } else {
+            require!(amount >= MIN_BURN_ONE_CHAIN, BridgeError::BurnTooSmall);
+            require!(
+                config
+                    .evm_receivers
+                    .iter()
+                    .any(|r| r.chain_id == target_chain_id && r.is_active),
                 BridgeError::UnsupportedChain
             );
         }
@@ -351,4 +365,6 @@ pub enum BridgeError {
     Unauthorized,
     #[msg("Too many EVM receivers. Maximum is 10.")]
     TooManyReceivers,
+    #[msg("EVM recipient is the zero address.")]
+    ZeroRecipient,
 }

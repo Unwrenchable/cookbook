@@ -468,7 +468,8 @@ describe("LPLocker", function () {
   });
 
   it("Locks LP tokens and emits Locked event", async function () {
-    const unlockAt = BigInt(Math.floor(Date.now() / 1000) + 86400);
+    const latest = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const unlockAt = BigInt(latest) + 86_400n;
     await lpToken.connect(user1).approve(await locker.getAddress(), LOCK_AMOUNT);
     const tx = await locker.connect(user1).lock(
       await lpToken.getAddress(), LOCK_AMOUNT, unlockAt
@@ -480,7 +481,8 @@ describe("LPLocker", function () {
   });
 
   it("Reverts unlock before time expires", async function () {
-    const unlockAt = BigInt(Math.floor(Date.now() / 1000) + 86400);
+    const latest = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const unlockAt = BigInt(latest) + 86_400n;
     await lpToken.connect(user1).approve(await locker.getAddress(), LOCK_AMOUNT);
     await locker.connect(user1).lock(await lpToken.getAddress(), LOCK_AMOUNT, unlockAt);
     await expect(locker.connect(user1).unlock(0n)).to.be.revertedWith("LPLocker: still locked");
@@ -494,21 +496,24 @@ describe("LPLocker", function () {
   });
 
   it("Reverts lock with unlock timestamp in past", async function () {
-    const unlockAt = BigInt(Math.floor(Date.now() / 1000) - 1);
+    const latest = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const unlockAt = BigInt(latest) - 1n;
     await expect(
       locker.connect(user1).lock(await lpToken.getAddress(), LOCK_AMOUNT, unlockAt)
     ).to.be.revertedWith("LPLocker: unlock in past");
   });
 
   it("Reverts unlock attempt by non-owner of lock", async function () {
-    const unlockAt = BigInt(Math.floor(Date.now() / 1000) + 86400);
+    const latest = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const unlockAt = BigInt(latest) + 86_400n;
     await lpToken.connect(user1).approve(await locker.getAddress(), LOCK_AMOUNT);
     await locker.connect(user1).lock(await lpToken.getAddress(), LOCK_AMOUNT, unlockAt);
     await expect(locker.connect(owner).unlock(0n)).to.be.revertedWith("LPLocker: not owner");
   });
 
   it("Returns correct lock IDs by owner", async function () {
-    const unlockAt = BigInt(Math.floor(Date.now() / 1000) + 86400);
+    const latest = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const unlockAt = BigInt(latest) + 86_400n;
     await lpToken.connect(user1).approve(await locker.getAddress(), LOCK_AMOUNT * 2n);
     await locker.connect(user1).lock(await lpToken.getAddress(), LOCK_AMOUNT, unlockAt);
     await locker.connect(user1).lock(await lpToken.getAddress(), LOCK_AMOUNT, unlockAt);
@@ -519,7 +524,8 @@ describe("LPLocker", function () {
   });
 
   it("totalLocks increments with each lock", async function () {
-    const unlockAt = BigInt(Math.floor(Date.now() / 1000) + 86400);
+    const latest = (await ethers.provider.getBlock("latest"))!.timestamp;
+    const unlockAt = BigInt(latest) + 86_400n;
     await lpToken.connect(user1).approve(await locker.getAddress(), LOCK_AMOUNT);
     await locker.connect(user1).lock(await lpToken.getAddress(), LOCK_AMOUNT, unlockAt);
     expect(await locker.totalLocks()).to.equal(1n);

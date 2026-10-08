@@ -9,9 +9,9 @@ const PINATA_BASE = "https://api.pinata.cloud";
 /** 5 MB max logo size. */
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 /** Allowed MIME types for token logos. */
-const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml"]);
-/** Allowed file extensions (as a secondary guard). */
-const ALLOWED_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg)$/i;
+const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+/** Allowed file extensions (as a secondary guard). SVG is excluded: gateways serve it as active content. */
+const ALLOWED_EXTENSIONS = /\.(png|jpe?g|gif|webp)$/i;
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     // File type validation
     if (!ALLOWED_MIME_TYPES.has(file.type) || !ALLOWED_EXTENSIONS.test(file.name)) {
       return NextResponse.json(
-        { error: "Invalid file type. Only PNG, JPEG, GIF, WebP, and SVG are allowed." },
+        { error: "Invalid file type. Only PNG, JPEG, GIF, and WebP are allowed." },
         { status: 400 }
       );
     }

@@ -126,8 +126,8 @@ async function main() {
   if (!mintableToken) {
     throw new Error(
       `Missing mintable token address. Set ${mintableTokenEnvKey} or MINTABLE_TOKEN in .env.\n` +
-      `  This is the ERC20 contract that BurnBridgeReceiver will call .mint() on.\n` +
-      `  It must grant MINTER_ROLE to the deployed receiver address.`
+      `  Deploy contracts/bridge/BridgeMintableToken.sol first (scripts/deployBridgeMintableToken.ts),\n` +
+      `  then call setMinter(receiver) so only BurnBridgeReceiver can mint.`
     );
   }
 
