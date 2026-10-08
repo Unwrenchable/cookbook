@@ -30,26 +30,52 @@
     "turbo": "^2.9.14"
   },
   "overrides": {
-    "axios": "^1.15.0",
+    "axios": "1.20.0",
     "defu": "^6.1.5",
     "flatted": "^3.4.2",
     "h3": "^1.15.11",
-    "hono": "4.12.12",
+    "hono": "4.13.13",
     "lodash": "^4.18.1",
     "lodash-es": "^4.18.1",
     "picomatch": "^2.3.2",
     "serialize-javascript": "^7.0.5",
-    "socket.io-parser": "^4.2.6"
+    "socket.io-parser": "4.2.7"
   },
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
     "overrides": {
       "bs58": "^6.0.0",
       "@solana/sysvars": "^5.0.0",
-      "hono": "4.12.12",
-      "axios": "^1.15.0",
+      "hono": "4.13.13",
+      "axios": "1.20.0",
       "lodash": "^4.18.1",
-      "serialize-javascript": "^7.0.5"
+      "serialize-javascript": "^7.0.5",
+      "form-data@4.0.5": "4.0.6",
+      "browserslist@<4.28.7": "4.29.3",
+      "fast-uri@<3.1.8": "3.1.8",
+      "socket.io-parser@<4.2.7": "4.2.7",
+      "source-map-js@<1.2.2": "1.2.2",
+      "immutable@4.3.8": "4.3.9",
+      "ip-address@<10.7.1": "10.7.3",
+      "sharp@<0.35.0": "0.35.5",
+      "ws@>=8.0.0 <8.21.0": "8.22.0",
+      "ws@7.5.10": "7.5.13",
+      "@fastify/busboy@<3.2.2": "3.2.2",
+      "adm-zip@<0.6.1": "0.6.1",
+      "follow-redirects@<1.16.0": "1.16.1",
+      "bn.js@4.11.6": "4.12.3",
+      "pbkdf2@<3.1.7": "3.1.7",
+      "ua-parser-js@2.0.9": "2.0.10",
+      "uuid@11.1.0": "11.1.1",
+      "shell-quote": "1.12.0",
+      "protobufjs@<7.5.5": "7.6.6",
+      "js-yaml@3.14.2": "3.15.2",
+      "js-yaml@4.1.1": "4.3.2",
+      "brace-expansion@1.1.13": "1.1.21",
+      "brace-expansion@2.1.0": "2.1.7",
+      "brace-expansion@2.1.1": "2.1.7",
+      "brace-expansion@5.0.5": "5.0.12",
+      "postcss@<8.5.29": "8.5.29"
     },
     "peerDependencyRules": {
       "ignoreMissing": [

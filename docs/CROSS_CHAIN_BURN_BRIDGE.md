@@ -11,13 +11,7 @@ This creates a unique multi-chain token economics model where:
 
 > ⚠️ **Production Readiness Status**
 >
-> The Solana Anchor program emits a `BurnMessageEmitted` event but does **not yet CPI into the Wormhole `post_message` instruction**. On the EVM side, `BurnBridgeReceiver.receiveMessage()` currently **reverts** — it is a scaffold pending full Wormhole VAA integration.
->
-> For development and integration testing, use `BurnBridgeReceiver.receiveRelayedMessage()` together with a trusted off-chain relayer that decodes the Anchor event and submits the payload + replay key.
->
-> To complete the production bridge, two tasks remain:
-> 1. Add the Wormhole `post_message` CPI call to the Anchor program's `burn_and_bridge` instruction.
-> 2. Uncomment and test the `IWormhole.parseAndVerifyVM()` code path in `BurnBridgeReceiver.receiveMessage()`.
+> `receiveMessage` calls Wormhole core `parseAndVerifyVM`, checks the emitter allowlist, and rejects a replay of the VAA hash or sequence. There is no trusted-relayer mint path. The Solana program posts the burn through `burn_and_post` (Wormhole `post_message`, instruction byte 1). The old `burn_and_bridge` instruction is not in the program, so a client that still sends it does not burn tokens. Rotate the program id before any deploy. Admin changes on the receiver wait 24 hours. Pump graduation uses the canonical V2 router hardcoded for `block.chainid`. There is no admin or creator setter.
 
 ---
 
@@ -60,7 +54,7 @@ User (Phantom Wallet + MetaMask)
 
 **Anchor program** with instructions:
 - `initialize(evm_receivers)` — deployer sets up which EVM chains are supported
-- `burn_and_bridge(amount, target_chain_id, evm_recipient, consistency_level)` — core instruction
+- `burn_and_post(amount, target_chain_id, evm_recipient, consistency_level)` — burns and CPIs Wormhole `post_message`
 - `update_receivers(evm_receivers)` — admin can add/remove EVM chains
 
 **Payload format** (ABI-compatible with EVM receiver):
@@ -76,9 +70,8 @@ uint64   nonce               (8 bytes, big-endian)
 ### EVM: `contracts/evm/contracts/bridge/BurnBridgeReceiver.sol`
 
 **Solidity contract** per EVM chain with:
-- `receiveMessage(encodedVAA)` — full Wormhole VAA path (production)
-- `receiveRelayedMessage(payload)` — trusted-relayer path (development); replay key is derived on-chain via `keccak256(payload)`
-- `_processPayload(payload)` — decodes payload, mints ERC20
+- `receiveMessage(encodedVAA)` — guardian-checked Wormhole VAA. Anyone may submit it.
+- `_processPayload(payload)` — decodes the 114-byte payload and mints the ERC-20
 
 **Security features:**
 - VAA verification via `IWormhole(wormholeCore).parseAndVerifyVM()`

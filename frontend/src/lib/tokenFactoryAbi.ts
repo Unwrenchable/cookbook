@@ -120,18 +120,43 @@ export const TOKEN_FACTORY_ABI = [
     stateMutability: "view",
     type: "function",
   },
-  // setLaunchFeeBps (onlyOwner)
+  // queueSetLaunchFeeBps / executeSetLaunchFeeBps (owner queues, anyone executes after the delay)
   {
-    inputs: [{ internalType: "uint16", name: "_bps", type: "uint16" }],
-    name: "setLaunchFeeBps",
+    inputs: [{ internalType: "uint16", name: "bps", type: "uint16" }],
+    name: "queueSetLaunchFeeBps",
+    outputs: [
+      { internalType: "bytes32", name: "opId", type: "bytes32" },
+      { internalType: "uint256", name: "eta", type: "uint256" },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint16", name: "bps", type: "uint16" },
+      { internalType: "uint256", name: "eta", type: "uint256" },
+    ],
+    name: "executeSetLaunchFeeBps",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
   },
-  // setReferralShareBps (onlyOwner)
   {
-    inputs: [{ internalType: "uint16", name: "_bps", type: "uint16" }],
-    name: "setReferralShareBps",
+    inputs: [{ internalType: "uint16", name: "bps", type: "uint16" }],
+    name: "queueSetReferralShareBps",
+    outputs: [
+      { internalType: "bytes32", name: "opId", type: "bytes32" },
+      { internalType: "uint256", name: "eta", type: "uint256" },
+    ],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { internalType: "uint16", name: "bps", type: "uint16" },
+      { internalType: "uint256", name: "eta", type: "uint256" },
+    ],
+    name: "executeSetReferralShareBps",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",

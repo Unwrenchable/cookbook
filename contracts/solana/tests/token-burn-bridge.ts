@@ -7,20 +7,27 @@
  *
  * Coverage:
  *  ✓ initialize  – happy path, too many receivers
- *  ✓ burnAndBridge – Spark tier (1 chain), Blaze tier (3 chains), Inferno tier (all)
- *  ✓ burnAndBridge – burn too small, wrong mint, wrong owner, unsupported chain
+ *  ✓ burnAndPost – Spark tier (1 chain), Blaze tier (3 chains), Inferno tier (all)
+ *  ✓ burnAndPost – burn too small, unsupported chain, zero recipient
+ *  ✓ the removed burnAndBridge discriminator does not burn tokens
  *  ✓ updateReceivers – authority only, add/remove chains
  *  ✓ Replay protection – nonce increments per user, independent across users
  */
 
 import * as anchor from "@coral-xyz/anchor";
-import type { TokenBurnBridge }  from "../target/types/token_burn_bridge.ts";
+import type { Idl } from "@coral-xyz/anchor";
+import { readFileSync } from "fs";
+import { join } from "path";
 import BN from "bn.js";
 import {
   Keypair,
   PublicKey,
   SystemProgram,
   LAMPORTS_PER_SOL,
+  SYSVAR_CLOCK_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
+  Transaction,
+  TransactionInstruction,
 } from "@solana/web3.js";
 import {
   createMint,
@@ -75,7 +82,10 @@ describe("token-burn-bridge", () => {
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
-  const program = anchor.workspace.TokenBurnBridge as anchor.Program<TokenBurnBridge>;
+  const idl = JSON.parse(
+    readFileSync(join(__dirname, "../idl/token_burn_bridge.json"), "utf8")
+  ) as Idl;
+  const program = new anchor.Program(idl, provider);
   const connection = provider.connection;
 
   // Keypairs
@@ -103,6 +113,49 @@ describe("token-burn-bridge", () => {
     makeEvmReceiver(CHAIN_BASE,      FAKE_BASE_RECEIVER),
     makeEvmReceiver(CHAIN_AVALANCHE, FAKE_AVAX_RECEIVER),
   ];
+
+
+  const WORMHOLE_DEVNET = new PublicKey("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5");
+
+  async function postBurn(
+    user: Keypair,
+    tokenAccount: PublicKey,
+    noncePda: PublicKey,
+    amount: BN,
+    chain: number,
+    recipient: number[],
+    consistency: number,
+  ) {
+    const [emitter] = PublicKey.findProgramAddressSync([Buffer.from("emitter")], program.programId);
+    const [bridge] = PublicKey.findProgramAddressSync([Buffer.from("Bridge")], WORMHOLE_DEVNET);
+    const [feeCollector] = PublicKey.findProgramAddressSync([Buffer.from("fee_collector")], WORMHOLE_DEVNET);
+    const [sequence] = PublicKey.findProgramAddressSync(
+      [Buffer.from("Sequence"), emitter.toBuffer()],
+      WORMHOLE_DEVNET,
+    );
+    const message = Keypair.generate();
+    await program.methods
+      .burnAndPost(amount, chain, recipient, consistency)
+      .accounts({
+        config: configPda,
+        tokenMint: mint,
+        userTokenAccount: tokenAccount,
+        userNonce: noncePda,
+        user: user.publicKey,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+        wormholeProgram: WORMHOLE_DEVNET,
+        wormholeBridge: bridge,
+        wormholeMessage: message.publicKey,
+        wormholeEmitter: emitter,
+        wormholeSequence: sequence,
+        wormholeFeeCollector: feeCollector,
+        clock: SYSVAR_CLOCK_PUBKEY,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .signers([user, message])
+      .rpc();
+  }
 
   before(async () => {
     authority = Keypair.generate();
@@ -217,30 +270,41 @@ describe("token-burn-bridge", () => {
 
   // ─── Burn and bridge ───────────────────────────────────────────────────────
 
-  describe("burnAndBridge", () => {
+  describe("burnAndPost", () => {
     const evmRecipient = hexToBytes20("0xDeaDbeefdEAdbeefdEadbEEFdeadbeEFdEaDbeeF");
+
+    it("does not burn when a client sends the removed burn_and_bridge discriminator", async () => {
+      const { amount: before } = await getAccount(connection, user1TokenAccount);
+      const data = Buffer.from([0xbb, 0x09, 0xfc, 0xb7, 0x70, 0xe6, 0x54, 0x0e]);
+      const ix = new TransactionInstruction({
+        programId: program.programId,
+        keys: [
+          { pubkey: configPda, isSigner: false, isWritable: true },
+          { pubkey: mint, isSigner: false, isWritable: true },
+          { pubkey: user1TokenAccount, isSigner: false, isWritable: true },
+          { pubkey: user1NoncePda, isSigner: false, isWritable: true },
+          { pubkey: user1.publicKey, isSigner: true, isWritable: true },
+          { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        data,
+      });
+      const tx = new Transaction().add(ix);
+      try {
+        await provider.sendAndConfirm(tx, [user1]);
+        expect.fail("Expected the removed instruction to fail");
+      } catch (err: any) {
+        const message = err.toString();
+        expect(message).to.not.equal("");
+      }
+      const { amount: after } = await getAccount(connection, user1TokenAccount);
+      expect(after.toString()).to.equal(before.toString());
+    });
 
     it("Spark tier: burns 100 tokens and emits BurnMessageEmitted", async () => {
       const { amount: balBefore } = await getAccount(connection, user1TokenAccount);
 
-      await program.methods
-        .burnAndBridge(
-          MIN_BURN_ONE_CHAIN,
-          CHAIN_ETHEREUM,
-          evmRecipient,
-          1
-        )
-        .accounts({
-          config:           configPda,
-          tokenMint:        mint,
-          userTokenAccount: user1TokenAccount,
-          userNonce:        user1NoncePda,
-          user:             user1.publicKey,
-          tokenProgram:     TOKEN_PROGRAM_ID,
-          systemProgram:    SystemProgram.programId,
-        })
-        .signers([user1])
-        .rpc();
+      await postBurn(user1, user1TokenAccount, user1NoncePda, MIN_BURN_ONE_CHAIN, CHAIN_ETHEREUM, evmRecipient, 1);
 
       const { amount: balAfter } = await getAccount(connection, user1TokenAccount);
       expect((balBefore - balAfter).toString()).to.equal(MIN_BURN_ONE_CHAIN.toString());
@@ -256,24 +320,7 @@ describe("token-burn-bridge", () => {
     it("Blaze tier: burns 500 tokens targeting Polygon", async () => {
       const { amount: balBefore } = await getAccount(connection, user1TokenAccount);
 
-      await program.methods
-        .burnAndBridge(
-          MIN_BURN_THREE_CHAINS,
-          CHAIN_POLYGON,
-          evmRecipient,
-          1
-        )
-        .accounts({
-          config:           configPda,
-          tokenMint:        mint,
-          userTokenAccount: user1TokenAccount,
-          userNonce:        user1NoncePda,
-          user:             user1.publicKey,
-          tokenProgram:     TOKEN_PROGRAM_ID,
-          systemProgram:    SystemProgram.programId,
-        })
-        .signers([user1])
-        .rpc();
+      await postBurn(user1, user1TokenAccount, user1NoncePda, MIN_BURN_THREE_CHAINS, CHAIN_POLYGON, evmRecipient, 1);
 
       const { amount: balAfter } = await getAccount(connection, user1TokenAccount);
       expect((balBefore - balAfter).toString()).to.equal(MIN_BURN_THREE_CHAINS.toString());
@@ -283,24 +330,7 @@ describe("token-burn-bridge", () => {
     });
 
     it("Inferno tier: burns 1000 tokens with chain_id=0 (all chains)", async () => {
-      await program.methods
-        .burnAndBridge(
-          MIN_BURN_ALL_CHAINS,
-          0,          // 0 = broadcast to all configured chains
-          evmRecipient,
-          32          // finalized consistency level
-        )
-        .accounts({
-          config:           configPda,
-          tokenMint:        mint,
-          userTokenAccount: user1TokenAccount,
-          userNonce:        user1NoncePda,
-          user:             user1.publicKey,
-          tokenProgram:     TOKEN_PROGRAM_ID,
-          systemProgram:    SystemProgram.programId,
-        })
-        .signers([user1])
-        .rpc();
+      await postBurn(user1, user1TokenAccount, user1NoncePda, MIN_BURN_ALL_CHAINS, 0, evmRecipient, 32);
 
       const userNonce = await program.account.userNonce.fetch(user1NoncePda);
       expect(userNonce.nonce.toNumber()).to.equal(3);
@@ -316,19 +346,7 @@ describe("token-burn-bridge", () => {
     it("rejects burn below minimum (99 tokens)", async () => {
       const tooSmall = new BN("99000000000"); // 99 * 1e9
       try {
-        await program.methods
-          .burnAndBridge(tooSmall, CHAIN_ETHEREUM, evmRecipient, 1)
-          .accounts({
-            config:           configPda,
-            tokenMint:        mint,
-            userTokenAccount: user1TokenAccount,
-            userNonce:        user1NoncePda,
-            user:             user1.publicKey,
-            tokenProgram:     TOKEN_PROGRAM_ID,
-            systemProgram:    SystemProgram.programId,
-          })
-          .signers([user1])
-          .rpc();
+        await postBurn(user1, user1TokenAccount, user1NoncePda, tooSmall, CHAIN_ETHEREUM, evmRecipient, 1);
         expect.fail("Expected BurnTooSmall error");
       } catch (err: any) {
         expect(err.error?.errorCode?.code ?? err.toString()).to.include("BurnTooSmall");
@@ -337,19 +355,7 @@ describe("token-burn-bridge", () => {
 
     it("rejects unsupported chain ID", async () => {
       try {
-        await program.methods
-          .burnAndBridge(MIN_BURN_ONE_CHAIN, 999, evmRecipient, 1)
-          .accounts({
-            config:           configPda,
-            tokenMint:        mint,
-            userTokenAccount: user1TokenAccount,
-            userNonce:        user1NoncePda,
-            user:             user1.publicKey,
-            tokenProgram:     TOKEN_PROGRAM_ID,
-            systemProgram:    SystemProgram.programId,
-          })
-          .signers([user1])
-          .rpc();
+        await postBurn(user1, user1TokenAccount, user1NoncePda, MIN_BURN_ONE_CHAIN, 999, evmRecipient, 1);
         expect.fail("Expected UnsupportedChain error");
       } catch (err: any) {
         expect(err.error?.errorCode?.code ?? err.toString()).to.include("UnsupportedChain");
@@ -361,19 +367,7 @@ describe("token-burn-bridge", () => {
       const nonceBefore = await program.account.userNonce.fetchNullable(user2NoncePda);
       expect(nonceBefore).to.be.null; // not yet created
 
-      await program.methods
-        .burnAndBridge(MIN_BURN_ONE_CHAIN, CHAIN_BASE, evmRecipient, 1)
-        .accounts({
-          config:           configPda,
-          tokenMint:        mint,
-          userTokenAccount: user2TokenAccount,
-          userNonce:        user2NoncePda,
-          user:             user2.publicKey,
-          tokenProgram:     TOKEN_PROGRAM_ID,
-          systemProgram:    SystemProgram.programId,
-        })
-        .signers([user2])
-        .rpc();
+      await postBurn(user2, user2TokenAccount, user2NoncePda, MIN_BURN_ONE_CHAIN, CHAIN_BASE, evmRecipient, 1);
 
       const user2Nonce = await program.account.userNonce.fetch(user2NoncePda);
       const user1Nonce = await program.account.userNonce.fetch(user1NoncePda);
@@ -426,6 +420,16 @@ describe("token-burn-bridge", () => {
       const config = await program.account.bridgeConfig.fetch(configPda);
       const poly = config.evmReceivers.find((r: any) => r.chainId === CHAIN_POLYGON);
       expect(poly?.isActive).to.be.false;
+    });
+
+    it("rejects a burn to a deactivated chain", async () => {
+      const evmRecipient = hexToBytes20("0x1111111111111111111111111111111111111111");
+      try {
+        await postBurn(user2, user2TokenAccount, user2NoncePda, MIN_BURN_ONE_CHAIN, CHAIN_POLYGON, evmRecipient, 1);
+        expect.fail("Expected UnsupportedChain error");
+      } catch (err: any) {
+        expect(err.error?.errorCode?.code ?? err.toString()).to.include("UnsupportedChain");
+      }
     });
 
     it("rejects updateReceivers from non-authority", async () => {
@@ -485,38 +489,40 @@ describe("token-burn-bridge", () => {
 
     it("accepts exactly MIN_BURN_ONE_CHAIN (100 tokens)", async () => {
       const { amount: before } = await getAccount(connection, user2TokenAccount);
-      await program.methods
-        .burnAndBridge(MIN_BURN_ONE_CHAIN, CHAIN_BSC, evmRecipient, 1)
-        .accounts({
-          config:           configPda,
-          tokenMint:        mint,
-          userTokenAccount: user2TokenAccount,
-          userNonce:        user2NoncePda,
-          user:             user2.publicKey,
-          tokenProgram:     TOKEN_PROGRAM_ID,
-          systemProgram:    SystemProgram.programId,
-        })
-        .signers([user2])
-        .rpc();
+      await postBurn(user2, user2TokenAccount, user2NoncePda, MIN_BURN_ONE_CHAIN, CHAIN_BSC, evmRecipient, 1);
       const { amount: after } = await getAccount(connection, user2TokenAccount);
       expect((before - after).toString()).to.equal(MIN_BURN_ONE_CHAIN.toString());
     });
 
+    it("rejects chain_id 0 below MIN_BURN_ALL_CHAINS", async () => {
+      try {
+        await postBurn(user2, user2TokenAccount, user2NoncePda, MIN_BURN_ONE_CHAIN, 0, evmRecipient, 1);
+        expect.fail("Expected BurnTooSmall error");
+      } catch (err: any) {
+        expect(err.error?.errorCode?.code ?? err.toString()).to.include("BurnTooSmall");
+      }
+    });
+
+    it("rejects the zero EVM recipient", async () => {
+      try {
+        await postBurn(
+          user2,
+          user2TokenAccount,
+          user2NoncePda,
+          MIN_BURN_ONE_CHAIN,
+          CHAIN_BSC,
+          Array.from({ length: 20 }, () => 0),
+          1,
+        );
+        expect.fail("Expected ZeroRecipient error");
+      } catch (err: any) {
+        expect(err.error?.errorCode?.code ?? err.toString()).to.include("ZeroRecipient");
+      }
+    });
+
     it("accepts exactly MIN_BURN_ALL_CHAINS (1000 tokens) with chain_id=0", async () => {
       const nonceBefore = (await program.account.userNonce.fetch(user2NoncePda)).nonce;
-      await program.methods
-        .burnAndBridge(MIN_BURN_ALL_CHAINS, 0, evmRecipient, 32)
-        .accounts({
-          config:           configPda,
-          tokenMint:        mint,
-          userTokenAccount: user2TokenAccount,
-          userNonce:        user2NoncePda,
-          user:             user2.publicKey,
-          tokenProgram:     TOKEN_PROGRAM_ID,
-          systemProgram:    SystemProgram.programId,
-        })
-        .signers([user2])
-        .rpc();
+      await postBurn(user2, user2TokenAccount, user2NoncePda, MIN_BURN_ALL_CHAINS, 0, evmRecipient, 32);
       const nonceAfter = (await program.account.userNonce.fetch(user2NoncePda)).nonce;
       expect(nonceAfter.toNumber()).to.equal(nonceBefore.toNumber() + 1);
     });

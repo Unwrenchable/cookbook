@@ -411,7 +411,7 @@ Done — the UI detects the new chain immediately on next build.
 
 If you want to enable the **burn-to-activate** cross-chain mechanic (burn SPL tokens on Solana → mint ERC20 on EVM), follow the guide in [`docs/CROSS_CHAIN_BURN_BRIDGE.md`](./CROSS_CHAIN_BURN_BRIDGE.md).
 
-> ⚠️ **Scaffold status:** `BurnBridgeReceiver.receiveMessage()` currently reverts with a clear error message until the Wormhole VAA integration is complete. Development testing uses `receiveRelayedMessage()` with a trusted relayer. See the bridge guide for details.
+> `BurnBridgeReceiver.receiveMessage()` verifies a Wormhole VAA through the core contract. Deploy the Wormhole core address and the Solana emitter into the constructor. Admin changes wait 24 hours. See the bridge guide.
 
 The short version:
 

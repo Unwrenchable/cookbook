@@ -443,7 +443,7 @@ export function TokenForm({
             </Field>
           </div>
           <p className="mt-2 text-xs text-orange-200">
-            When ETH reserve hits the threshold, trading pauses 24 h. Call resumeTrading(pairAddress) after adding LP on Uniswap/PancakeSwap to reopen.
+            When the ETH reserve hits the threshold, that buy moves the reserve into this chain's canonical V2 router and burns the LP. Curve trading stops. Nobody can pick a different router.
           </p>
           {!form.marketingWallet && (
             <RiskWarningCard text="Fee wallet is empty. Set a valid owner/fee wallet before launch to avoid fee-routing mistakes." />

@@ -1,5 +1,5 @@
 {
-  "address": "11111111111111111111111111111111",
+  "address": "2sAka7jCkP71LbKk1MpELxFpjSHjScQk1aStrDt4Pnnf",
   "metadata": {
     "name": "token_burn_bridge",
     "version": "0.1.0",
@@ -44,41 +44,28 @@
       ]
     },
     {
-      "name": "burnAndBridge",
-      "discriminator": [187, 9, 252, 183, 112, 230, 84, 14],
+      "name": "burnAndPost",
+      "discriminator": [80, 223, 100, 20, 142, 98, 24, 102],
       "docs": [
-        "Burns SPL tokens and emits a Wormhole cross-chain message to activate",
-        "ERC20 minting on one or more EVM chains."
+        "Burns SPL tokens and posts the payload to Wormhole core post_message.",
+        "The removed burnAndBridge instruction is not part of this program."
       ],
       "accounts": [
-        {
-          "name": "config",
-          "writable": true
-        },
-        {
-          "name": "tokenMint",
-          "writable": true
-        },
-        {
-          "name": "userTokenAccount",
-          "writable": true
-        },
-        {
-          "name": "userNonce",
-          "writable": true,
-          "docs": ["Per-user nonce PDA for replay protection (seeds: [\"user-nonce\", user])"]
-        },
-        {
-          "name": "user",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "tokenProgram"
-        },
-        {
-          "name": "systemProgram"
-        }
+        { "name": "config", "writable": true },
+        { "name": "tokenMint", "writable": true },
+        { "name": "userTokenAccount", "writable": true },
+        { "name": "userNonce", "writable": true },
+        { "name": "user", "writable": true, "signer": true },
+        { "name": "tokenProgram" },
+        { "name": "systemProgram" },
+        { "name": "wormholeProgram" },
+        { "name": "wormholeBridge", "writable": true },
+        { "name": "wormholeMessage", "writable": true, "signer": true },
+        { "name": "wormholeEmitter" },
+        { "name": "wormholeSequence", "writable": true },
+        { "name": "wormholeFeeCollector", "writable": true },
+        { "name": "clock" },
+        { "name": "rent" }
       ],
       "args": [
         {
@@ -132,39 +119,61 @@
   "accounts": [
     {
       "name": "BridgeConfig",
-      "discriminator": [40, 206, 51, 233, 246, 40, 178, 85],
+      "discriminator": [40, 206, 51, 233, 246, 40, 178, 85]
+    },
+    {
+      "name": "UserNonce",
+      "discriminator": [235, 133, 1, 243, 18, 135, 88, 224]
+    }
+  ],
+  "types": [
+    {
+      "name": "BridgeConfig",
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "authority",         "type": "pubkey" },
-          { "name": "tokenMint",         "type": "pubkey" },
-          { "name": "evmReceivers",      "type": { "vec": { "defined": { "name": "EvmChainReceiver" } } } },
-          { "name": "totalBurned",       "type": "u64" },
+          { "name": "authority", "type": "pubkey" },
+          { "name": "tokenMint", "type": "pubkey" },
+          { "name": "evmReceivers", "type": { "vec": { "defined": { "name": "EvmChainReceiver" } } } },
+          { "name": "totalBurned", "type": "u64" },
           { "name": "totalMessagesSent", "type": "u64" },
-          { "name": "bump",              "type": "u8" }
+          { "name": "bump", "type": "u8" }
         ]
       }
     },
     {
       "name": "UserNonce",
-      "discriminator": [235, 133, 1, 243, 18, 135, 88, 224],
       "type": {
         "kind": "struct",
         "fields": [
           { "name": "nonce", "type": "u64" }
         ]
       }
-    }
-  ],
-  "types": [
+    },
     {
       "name": "EvmChainReceiver",
       "type": {
         "kind": "struct",
         "fields": [
-          { "name": "chainId",         "type": "u16" },
+          { "name": "chainId", "type": "u16" },
           { "name": "receiverAddress", "type": { "array": ["u8", 20] } },
-          { "name": "isActive",        "type": "bool" }
+          { "name": "isActive", "type": "bool" }
+        ]
+      }
+    },
+    {
+      "name": "BurnMessageEmitted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          { "name": "sequence", "type": "u64" },
+          { "name": "solanaMint", "type": "pubkey" },
+          { "name": "solanaSender", "type": "pubkey" },
+          { "name": "evmRecipient", "type": { "array": ["u8", 20] } },
+          { "name": "amountBurned", "type": "u64" },
+          { "name": "targetChainId", "type": "u16" },
+          { "name": "payloadHash", "type": { "array": ["u8", 32] } },
+          { "name": "consistencyLevel", "type": "u8" }
         ]
       }
     }
@@ -172,17 +181,7 @@
   "events": [
     {
       "name": "BurnMessageEmitted",
-      "discriminator": [31, 132, 141, 109, 6, 47, 154, 84],
-      "fields": [
-        { "name": "sequence",         "type": "u64" },
-        { "name": "solanaMint",       "type": "pubkey" },
-        { "name": "solanaSender",     "type": "pubkey" },
-        { "name": "evmRecipient",     "type": { "array": ["u8", 20] } },
-        { "name": "amountBurned",     "type": "u64" },
-        { "name": "targetChainId",    "type": "u16" },
-        { "name": "payloadHash",      "type": { "array": ["u8", 32] } },
-        { "name": "consistencyLevel", "type": "u8" }
-      ]
+      "discriminator": [31, 132, 141, 109, 6, 47, 154, 84]
     }
   ],
   "errors": [
@@ -192,6 +191,11 @@
     { "code": 6003, "name": "WrongMint",            "msg": "Token mint does not match bridge config." },
     { "code": 6004, "name": "WrongOwner",           "msg": "Token account owner does not match signer." },
     { "code": 6005, "name": "Unauthorized",         "msg": "Unauthorized: only the bridge authority can call this." },
-    { "code": 6006, "name": "TooManyReceivers",     "msg": "Too many EVM receivers. Maximum is 10." }
+    { "code": 6006, "name": "TooManyReceivers",     "msg": "Too many EVM receivers. Maximum is 10." },
+    { "code": 6007, "name": "ZeroRecipient",       "msg": "EVM recipient is the zero address." },
+    { "code": 6008, "name": "BadWormholeProgram",  "msg": "Wormhole program id is not mainnet or devnet core." },
+    { "code": 6009, "name": "BadEmitter",          "msg": "Emitter account is not this program's emitter PDA." },
+    { "code": 6010, "name": "BadWormholeAccount",  "msg": "Wormhole account address does not match the expected PDA." },
+    { "code": 6011, "name": "BadPayload",          "msg": "Bridge payload must be exactly 114 bytes." }
   ]
 }

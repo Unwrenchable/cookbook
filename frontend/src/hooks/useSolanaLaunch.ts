@@ -2,7 +2,7 @@
  * useSolanaLaunch.ts – Hook for the Solana-first cross-chain burn-to-activate flow.
  *
  * Steps:
- *  1. Build a `burnAndBridge` instruction via the Anchor SDK and send it.
+ *  1. Build a `burn_and_post` instruction and send it.
  *  2. Poll Wormhole Scan API for the signed VAA produced by the burn tx.
  *  3. Submit the VAA to BurnBridgeReceiver.sol on each target EVM chain via viem.
  *
@@ -14,7 +14,7 @@
 
 import { useState, useCallback }       from "react";
 import { useWallet, useConnection }    from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction, Keypair, SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   createWalletClient,
@@ -31,7 +31,7 @@ import {
   TOKEN_BURN_BRIDGE_PROGRAM_ID,
   BRIDGE_CONFIG_SEED,
   USER_NONCE_SEED,
-  DISCRIMINATOR_BURN_AND_BRIDGE,
+  DISCRIMINATOR_BURN_AND_POST,
 } from "@/lib/solanaIdl";
 import { BURN_BRIDGE_RECEIVER_ABI } from "@/lib/burnBridgeReceiverAbi";
 
@@ -209,7 +209,7 @@ export function useSolanaLaunch() {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Build and send the `burnAndBridge` Anchor instruction.
+ * Build and send the `burn_and_post` instruction.
  *
  * When the program ID is still the system-program placeholder ("111…"), we fall
  * back to a no-op transaction so the UI remains functional during local dev
@@ -254,10 +254,23 @@ async function executeBurnAndBridge(
     return sig;
   }
 
-  // ── Build the burnAndBridge instruction manually ────────────────────────────
+  // ── Build the burn_and_post instruction manually ─────────────────────────────
   // We avoid importing @coral-xyz/anchor in the browser bundle to keep bundle
   // size lean. The discriminator is the single source of truth from solanaIdl.ts.
-  const discriminator = DISCRIMINATOR_BURN_AND_BRIDGE;
+  const discriminator = DISCRIMINATOR_BURN_AND_POST;
+  const wormholeProgram = new PublicKey(
+    params.isTestnet
+      ? "3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5"
+      : "worm2ZoG2kUd4vFXhvJh93UUH596ayRfgQ2MgjNMTth"
+  );
+  const [emitterPda] = PublicKey.findProgramAddressSync([Buffer.from("emitter")], programId);
+  const [wormholeBridge] = PublicKey.findProgramAddressSync([Buffer.from("Bridge")], wormholeProgram);
+  const [feeCollector] = PublicKey.findProgramAddressSync([Buffer.from("fee_collector")], wormholeProgram);
+  const [sequencePda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("Sequence"), emitterPda.toBuffer()],
+    wormholeProgram
+  );
+  const wormholeMessage = Keypair.generate();
 
   // Primary chain: first in list, or 0 for "all chains"
   const primaryChainId = params.targetChainIds.length === 1 ? params.targetChainIds[0] : 0;
@@ -274,7 +287,7 @@ async function executeBurnAndBridge(
   amountBuf.writeUInt32LE(hi, 4);
 
   chainBuf.writeUInt16LE(primaryChainId, 0);
-  consistBuf.writeUInt8(1, 0); // confirmed
+  consistBuf.writeUInt8(32, 0); // finalized; the program maps >= 32 to Wormhole's Finalized enum
 
   const data = Buffer.concat([
     discriminator,
@@ -294,13 +307,39 @@ async function executeBurnAndBridge(
     { pubkey: userPubkey,              isSigner: true,  isWritable: true  },
     { pubkey: TOKEN_PROGRAM_ID,        isSigner: false, isWritable: false },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    { pubkey: wormholeProgram,         isSigner: false, isWritable: false },
+    { pubkey: wormholeBridge,          isSigner: false, isWritable: true  },
+    { pubkey: wormholeMessage.publicKey, isSigner: true, isWritable: true },
+    { pubkey: emitterPda,              isSigner: false, isWritable: false },
+    { pubkey: sequencePda,             isSigner: false, isWritable: true  },
+    { pubkey: feeCollector,            isSigner: false, isWritable: true  },
+    { pubkey: SYSVAR_CLOCK_PUBKEY,     isSigner: false, isWritable: false },
+    { pubkey: SYSVAR_RENT_PUBKEY,      isSigner: false, isWritable: false },
   ];
 
   const ix = new TransactionInstruction({ keys, programId, data });
 
+  const bridgeInfo = await connection.getAccountInfo(wormholeBridge);
+  let wormholeFee = 0;
+  if (bridgeInfo && bridgeInfo.data.length >= 24) {
+    const fee = bridgeInfo.data.readBigUInt64LE(16);
+    if (fee > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error("Wormhole bridge fee is larger than this client can transfer.");
+    }
+    wormholeFee = Number(fee);
+  }
+
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   const tx = new Transaction({ feePayer: userPubkey, blockhash, lastValidBlockHeight });
+  if (wormholeFee > 0) {
+    tx.add(SystemProgram.transfer({
+      fromPubkey: userPubkey,
+      toPubkey: feeCollector,
+      lamports: wormholeFee,
+    }));
+  }
   tx.add(ix);
+  tx.partialSign(wormholeMessage);
 
   const signature = await sendTransaction(tx, connection);
   await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
@@ -360,40 +399,13 @@ function parseVaaEnvelope(vaaBytes: `0x${string}`): Pick<WormholeVAA, "sequence"
   };
 }
 
-function buildSimulatedPayload(
-  txHash: string,
-  params: Pick<SolanaLaunchParams, "targetChainIds" | "evmRecipient" | "burnAmount" | "tokenDecimals" | "tokenMint">
-): `0x${string}` {
-  const payload = Buffer.alloc(114, 0);
-
-  try {
-    new PublicKey(params.tokenMint).toBuffer().copy(payload, 0, 0, 32);
-  } catch {
-    // keep zeroed mint bytes for local simulation
-  }
-
-  Buffer.from(params.evmRecipient.replace(/^0x/i, "").padStart(40, "0"), "hex").copy(payload, 64);
-
-  const decimals = params.tokenDecimals ?? 9;
-  const rawAmount = BigInt(Math.max(1, Math.floor(params.burnAmount * 10 ** decimals)));
-  payload.writeBigUInt64BE(rawAmount, 96);
-
-  const targetChainId = params.targetChainIds.length === 1 ? params.targetChainIds[0] : 0;
-  payload.writeUInt16BE(targetChainId, 104);
-
-  const numericTail = BigInt(parseInt(txHash.slice(0, 12), 16) || Date.now());
-  payload.writeBigUInt64BE(numericTail, 106);
-
-  return `0x${payload.toString("hex")}` as `0x${string}`;
-}
-
 /**
  * Poll Wormhole Scan API for VAA(s) produced by a Solana tx.
- * Falls back to a simulated relay payload after timeout (development only).
+ * A timeout does not invent a payload. The wallet is not asked to submit one.
  */
 async function pollForVAAs(
   txHash:      string,
-  params:      Pick<SolanaLaunchParams, "targetChainIds" | "evmRecipient" | "burnAmount" | "tokenDecimals" | "tokenMint">,
+  _params:     Pick<SolanaLaunchParams, "targetChainIds" | "evmRecipient" | "burnAmount" | "tokenDecimals" | "tokenMint">,
   isTestnet:   boolean,
   maxRetries = 30,
   delayMs =    4_000
@@ -426,18 +438,7 @@ async function pollForVAAs(
     }
   }
 
-  // Simulation fallback — keeps UI functional during local dev / no-op mode
-  console.warn("[useSolanaLaunch] Wormhole VAA polling timed out — using simulated relayer payload");
-  return [
-    {
-      sequence:     String(Date.now()),
-      emitterChain: 1,
-      emitterAddr:  "0000000000000000000000000000000000000000000000000000000000000001",
-      vaaBytes:     `0x${"ab".repeat(100)}` as `0x${string}`,
-      payloadBytes: buildSimulatedPayload(txHash, params),
-      txHash,
-    },
-  ];
+  throw new Error("Wormhole proof was not available yet. No transaction was sent.");
 }
 
 /**
@@ -461,14 +462,18 @@ async function submitVAAToEVM(
     transport: custom((window as Window & { ethereum: unknown }).ethereum),
   });
   const [account] = await walletClient.getAddresses();
+  const walletChainId = await walletClient.getChainId();
+  if (walletChainId !== target.evmChainId) {
+    throw new Error(`Switch your wallet to ${target.name} (chain ${target.evmChainId}) before submitting. It is on chain ${walletChainId}.`);
+  }
 
   try {
     const txHash = await walletClient.writeContract({
       account,
       address:      receiverAddress,
       abi:          BURN_BRIDGE_RECEIVER_ABI,
-      functionName: "receiveRelayedMessage",
-      args:         [vaa.payloadBytes],
+      functionName: "receiveMessage",
+      args:         [vaa.vaaBytes],
       chain:        null,
     });
 
@@ -476,10 +481,9 @@ async function submitVAAToEVM(
     return txHash;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/trusted relayer/i.test(message)) {
+    if (/invalid VAA|emitter not allowed/i.test(message)) {
       throw new Error(
-        `${target.name} rejected the submission because this wallet is not an approved relayer. ` +
-        `Add it via setTrustedRelayer(...) or route through your backend relayer service.`
+        `${target.name} rejected the Wormhole proof. The guardian signatures or the emitter allowlist did not match.`
       );
     }
     throw error;

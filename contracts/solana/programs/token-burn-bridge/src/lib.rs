@@ -3,9 +3,9 @@
 //! This Anchor program is the Solana half of the cross-chain burn-to-activate mechanic:
 //!
 //! 1. User holds SPL tokens on Solana.
-//! 2. User calls `burn_and_bridge()` specifying a target EVM chain + recipient.
-//! 3. Program burns the SPL tokens and emits a structured message via `post_message`
-//!    to the **Wormhole Core Bridge** on Solana.
+//! 2. Wallets call `burn_and_post` with a target EVM chain and recipient.
+//! 3. The program burns the SPL tokens and CPIs Wormhole core `post_message`.
+//!    There is no event-only burn. A call that does not post a VAA does not burn.
 //! 4. Wormhole guardians sign the VAA (Verified Action Approval).
 //! 5. The VAA is submitted to `BurnBridgeReceiver.sol` on the target EVM chain.
 //! 6. The EVM contract mints the corresponding ERC20 tokens to the recipient.
@@ -27,7 +27,12 @@
 
 #![allow(unexpected_cfgs)]
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::instruction::AccountMeta;
 use anchor_spl::token::{self, Burn, Mint, Token, TokenAccount};
+
+/// Wormhole core bridge program ids. The CPI refuses any other program.
+pub const WORMHOLE_CORE_MAINNET: Pubkey = pubkey!("worm2ZoG2kUd4vFXhvJh93UUH596ayRfgQ2MgjNMTth");
+pub const WORMHOLE_CORE_DEVNET: Pubkey = pubkey!("3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5");
 
 /// Program ID placeholder — replace with the output of `anchor build` / `solana-keygen new`.
 /// Run: `solana-keygen new --outfile target/deploy/token_burn_bridge-keypair.json`
@@ -87,113 +92,150 @@ pub mod token_burn_bridge {
         Ok(())
     }
 
-    // ─── Burn and bridge ──────────────────────────────────────────────────────
+    // ─── Burn and post ────────────────────────────────────────────────────────
+    // `burn_and_bridge` was removed. It burned tokens and only emitted an event,
+    // so a user could lose tokens with nothing to claim on EVM. The old
+    // discriminator is not an instruction in this program.
 
-    /// Burns SPL tokens and emits a Wormhole cross-chain message to activate
-    /// ERC20 minting on one or more EVM chains.
+    /// Burns SPL tokens and posts the 114-byte payload to Wormhole core `post_message`.
+    /// The emitter is this program's `["emitter"]` PDA.
     ///
     /// `amount`            – raw token units to burn (includes decimals)
     /// `target_chain_id`   – Wormhole chain ID of the target EVM chain (0 = all)
     /// `evm_recipient`     – 20-byte EVM address of the token recipient
-    /// `consistency_level` – Wormhole finality (1 = confirmed, 32 = finalized)
-    pub fn burn_and_bridge(
-        ctx: Context<BurnAndBridge>,
+    /// `consistency_level` – below 32 posts Confirmed; 32 or above posts Finalized
+    pub fn burn_and_post(
+        ctx: Context<BurnAndPost>,
         amount: u64,
         target_chain_id: u16,
         evm_recipient: [u8; 20],
         consistency_level: u8,
     ) -> Result<()> {
-        // ── Validation ───────────────────────────────────────────────────────
-        require!(amount >= MIN_BURN_ONE_CHAIN, BridgeError::BurnTooSmall);
         require!(
             ctx.accounts.user_token_account.amount >= amount,
             BridgeError::InsufficientBalance
         );
+        require!(evm_recipient != [0u8; 20], BridgeError::ZeroRecipient);
+
+        let wormhole_id = ctx.accounts.wormhole_program.key();
+        require!(
+            wormhole_id == WORMHOLE_CORE_MAINNET || wormhole_id == WORMHOLE_CORE_DEVNET,
+            BridgeError::BadWormholeProgram
+        );
+
+        let (emitter, emitter_bump) = Pubkey::find_program_address(&[b"emitter"], ctx.program_id);
+        require!(ctx.accounts.wormhole_emitter.key() == emitter, BridgeError::BadEmitter);
+
+        let (bridge, _) = Pubkey::find_program_address(&[b"Bridge"], &wormhole_id);
+        let (fee_collector, _) = Pubkey::find_program_address(&[b"fee_collector"], &wormhole_id);
+        let (sequence, _) =
+            Pubkey::find_program_address(&[b"Sequence", emitter.as_ref()], &wormhole_id);
+        require!(ctx.accounts.wormhole_bridge.key() == bridge, BridgeError::BadWormholeAccount);
+        require!(
+            ctx.accounts.wormhole_fee_collector.key() == fee_collector,
+            BridgeError::BadWormholeAccount
+        );
+        require!(ctx.accounts.wormhole_sequence.key() == sequence, BridgeError::BadWormholeAccount);
+        require!(
+            ctx.accounts.clock.key() == anchor_lang::solana_program::sysvar::clock::ID,
+            BridgeError::BadWormholeAccount
+        );
+        require!(
+            ctx.accounts.rent.key() == anchor_lang::solana_program::sysvar::rent::ID,
+            BridgeError::BadWormholeAccount
+        );
 
         let config = &ctx.accounts.config;
-
-        // Validate target chain is supported (or 0 = all)
-        if target_chain_id != 0 {
+        if target_chain_id == 0 {
+            require!(amount >= MIN_BURN_ALL_CHAINS, BridgeError::BurnTooSmall);
             require!(
-                config.evm_receivers.iter().any(|r| r.chain_id == target_chain_id),
+                config.evm_receivers.iter().any(|r| r.is_active),
+                BridgeError::UnsupportedChain
+            );
+        } else {
+            require!(amount >= MIN_BURN_ONE_CHAIN, BridgeError::BurnTooSmall);
+            require!(
+                config
+                    .evm_receivers
+                    .iter()
+                    .any(|r| r.chain_id == target_chain_id && r.is_active),
                 BridgeError::UnsupportedChain
             );
         }
 
-        // ── Increment user nonce (replay protection) ──────────────────────────
         let user_nonce = &mut ctx.accounts.user_nonce;
         let nonce = user_nonce.nonce;
         user_nonce.nonce += 1;
 
-        // ── Burn SPL tokens ───────────────────────────────────────────────────
         token::burn(
             CpiContext::new(
                 ctx.accounts.token_program.to_account_info(),
                 Burn {
-                    mint:      ctx.accounts.token_mint.to_account_info(),
-                    from:      ctx.accounts.user_token_account.to_account_info(),
+                    mint: ctx.accounts.token_mint.to_account_info(),
+                    from: ctx.accounts.user_token_account.to_account_info(),
                     authority: ctx.accounts.user.to_account_info(),
                 },
             ),
             amount,
         )?;
 
-        // ── Build Wormhole payload ─────────────────────────────────────────────
-        // Layout (ABI-compatible with BurnBridgeReceiver.sol):
-        //   bytes32 solanaSourceMint   (32 bytes)
-        //   bytes32 solanaSender       (32 bytes)
-        //   bytes20 evmRecipient       (20 bytes, right-padded to 32)
-        //   uint64  amount             (8 bytes, big-endian)
-        //   uint16  targetChainId      (2 bytes, big-endian)
-        //   uint64  nonce              (8 bytes, big-endian)
-        let mut payload: Vec<u8> = Vec::with_capacity(134);
-
-        // Solana mint pubkey (32 bytes)
+        let mut payload: Vec<u8> = Vec::with_capacity(114);
         payload.extend_from_slice(&ctx.accounts.token_mint.key().to_bytes());
-        // Solana sender pubkey (32 bytes)
         payload.extend_from_slice(&ctx.accounts.user.key().to_bytes());
-        // EVM recipient (20 bytes + 12 zero bytes padding)
         payload.extend_from_slice(&evm_recipient);
         payload.extend_from_slice(&[0u8; 12]);
-        // Amount (8 bytes big-endian)
         payload.extend_from_slice(&amount.to_be_bytes());
-        // Target chain ID (2 bytes big-endian)
         payload.extend_from_slice(&target_chain_id.to_be_bytes());
-        // Nonce (8 bytes big-endian)
         payload.extend_from_slice(&nonce.to_be_bytes());
+        require!(payload.len() == 114, BridgeError::BadPayload);
 
-        // ── Post message to Wormhole Core Bridge ──────────────────────────────
-        //
-        // In a production deployment, use the Wormhole Anchor CPI crate:
-        //   wormhole_anchor_sdk::wormhole::post_message(cpi_ctx, nonce, payload, consistency_level)
-        //
-        // For now we emit an on-chain event that an off-chain relayer can pick up.
-        // Replace this with the actual Wormhole CPI once the Wormhole program is
-        // added as a dependency.
+        let ix = anchor_lang::solana_program::instruction::Instruction {
+            program_id: wormhole_id,
+            accounts: vec![
+                AccountMeta::new(ctx.accounts.wormhole_bridge.key(), false),
+                AccountMeta::new(ctx.accounts.wormhole_message.key(), true),
+                AccountMeta::new_readonly(emitter, true),
+                AccountMeta::new(ctx.accounts.wormhole_sequence.key(), false),
+                AccountMeta::new(ctx.accounts.user.key(), true),
+                AccountMeta::new(ctx.accounts.wormhole_fee_collector.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.clock.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.rent.key(), false),
+                AccountMeta::new_readonly(ctx.accounts.system_program.key(), false),
+            ],
+            data: wormhole_post_message_data(nonce as u32, &payload, consistency_level),
+        };
+        let bump_seed = [emitter_bump];
+        let signer_seeds: &[&[u8]] = &[b"emitter", &bump_seed];
+        anchor_lang::solana_program::program::invoke_signed(
+            &ix,
+            &[
+                ctx.accounts.wormhole_bridge.to_account_info(),
+                ctx.accounts.wormhole_message.to_account_info(),
+                ctx.accounts.wormhole_emitter.to_account_info(),
+                ctx.accounts.wormhole_sequence.to_account_info(),
+                ctx.accounts.user.to_account_info(),
+                ctx.accounts.wormhole_fee_collector.to_account_info(),
+                ctx.accounts.clock.to_account_info(),
+                ctx.accounts.rent.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ],
+            &[signer_seeds],
+        )?;
+
         emit!(BurnMessageEmitted {
-            sequence:          nonce,
-            solana_mint:       ctx.accounts.token_mint.key(),
-            solana_sender:     ctx.accounts.user.key(),
+            sequence: nonce,
+            solana_mint: ctx.accounts.token_mint.key(),
+            solana_sender: ctx.accounts.user.key(),
             evm_recipient,
-            amount_burned:     amount,
+            amount_burned: amount,
             target_chain_id,
-            payload_hash:      anchor_lang::solana_program::keccak::hash(&payload).0,
+            payload_hash: anchor_lang::solana_program::keccak::hash(&payload).0,
             consistency_level,
         });
 
-        // ── Update global stats ───────────────────────────────────────────────
         let config = &mut ctx.accounts.config;
-        config.total_burned        = config.total_burned.saturating_add(amount);
+        config.total_burned = config.total_burned.saturating_add(amount);
         config.total_messages_sent = config.total_messages_sent.saturating_add(1);
-
-        msg!(
-            "Burned {} tokens. Wormhole message #{} → chain {}. Recipient: {:?}",
-            amount,
-            nonce,
-            target_chain_id,
-            evm_recipient
-        );
-
         Ok(())
     }
 
@@ -233,41 +275,48 @@ pub struct Initialize<'info> {
 }
 
 #[derive(Accounts)]
-pub struct BurnAndBridge<'info> {
-    #[account(
-        mut,
-        seeds = [BRIDGE_CONFIG_SEEDS],
-        bump  = config.bump
-    )]
+pub struct BurnAndPost<'info> {
+    #[account(mut, seeds = [BRIDGE_CONFIG_SEEDS], bump = config.bump)]
     pub config: Account<'info, BridgeConfig>,
-
-    #[account(
-        mut,
-        constraint = token_mint.key() == config.token_mint @ BridgeError::WrongMint
-    )]
+    #[account(mut, constraint = token_mint.key() == config.token_mint @ BridgeError::WrongMint)]
     pub token_mint: Account<'info, Mint>,
-
     #[account(
         mut,
         constraint = user_token_account.owner == user.key() @ BridgeError::WrongOwner,
-        constraint = user_token_account.mint  == token_mint.key() @ BridgeError::WrongMint
+        constraint = user_token_account.mint == token_mint.key() @ BridgeError::WrongMint
     )]
     pub user_token_account: Account<'info, TokenAccount>,
-
     #[account(
         init_if_needed,
-        payer  = user,
-        space  = UserNonce::LEN,
-        seeds  = [USER_NONCE_SEEDS, user.key().as_ref()],
+        payer = user,
+        space = UserNonce::LEN,
+        seeds = [USER_NONCE_SEEDS, user.key().as_ref()],
         bump
     )]
     pub user_nonce: Account<'info, UserNonce>,
-
     #[account(mut)]
     pub user: Signer<'info>,
-
-    pub token_program:  Program<'info, Token>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
+    /// CHECK: must be Wormhole core mainnet or devnet.
+    pub wormhole_program: UncheckedAccount<'info>,
+    /// CHECK: Wormhole ["Bridge"] PDA.
+    #[account(mut)]
+    pub wormhole_bridge: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub wormhole_message: Signer<'info>,
+    /// CHECK: ["emitter"] PDA of this program.
+    pub wormhole_emitter: UncheckedAccount<'info>,
+    /// CHECK: Wormhole ["Sequence", emitter] PDA.
+    #[account(mut)]
+    pub wormhole_sequence: UncheckedAccount<'info>,
+    /// CHECK: Wormhole ["fee_collector"] PDA.
+    #[account(mut)]
+    pub wormhole_fee_collector: UncheckedAccount<'info>,
+    /// CHECK: Clock sysvar.
+    pub clock: UncheckedAccount<'info>,
+    /// CHECK: Rent sysvar.
+    pub rent: UncheckedAccount<'info>,
 }
 
 #[derive(Accounts)]
@@ -351,4 +400,27 @@ pub enum BridgeError {
     Unauthorized,
     #[msg("Too many EVM receivers. Maximum is 10.")]
     TooManyReceivers,
+    #[msg("EVM recipient is the zero address.")]
+    ZeroRecipient,
+    #[msg("Wormhole program id is not mainnet or devnet core.")]
+    BadWormholeProgram,
+    #[msg("Emitter account is not this program's emitter PDA.")]
+    BadEmitter,
+    #[msg("Wormhole account address does not match the expected PDA.")]
+    BadWormholeAccount,
+    #[msg("Bridge payload must be exactly 114 bytes.")]
+    BadPayload,
+}
+
+/// Borsh layout of Wormhole `PostMessage`: instruction byte 1, then nonce, payload, consistency enum.
+/// Consistency enum is 0 for confirmed and 1 for finalized. The VAA later stores 1 or 32.
+fn wormhole_post_message_data(nonce: u32, payload: &[u8], consistency_level: u8) -> Vec<u8> {
+    let level: u8 = if consistency_level >= 32 { 1 } else { 0 };
+    let mut data = Vec::with_capacity(1 + 4 + 4 + payload.len() + 1);
+    data.push(1u8);
+    data.extend_from_slice(&nonce.to_le_bytes());
+    data.extend_from_slice(&(payload.len() as u32).to_le_bytes());
+    data.extend_from_slice(payload);
+    data.push(level);
+    data
 }

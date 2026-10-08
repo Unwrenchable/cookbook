@@ -57,6 +57,9 @@ contract LPLocker is ReentrancyGuard {
         uint256 amount
     );
 
+    event LockExtended(uint256 indexed lockId, uint256 newUnlockAt);
+    event LockTransferred(uint256 indexed lockId, address indexed from, address indexed to);
+
     // ─── External ─────────────────────────────────────────────────────────────
 
     /**
@@ -75,19 +78,55 @@ contract LPLocker is ReentrancyGuard {
         require(amount    > 0,          "LPLocker: amount = 0");
         require(unlockAt  > block.timestamp, "LPLocker: unlock in past");
 
+        uint256 balanceBefore = IERC20(lpToken).balanceOf(address(this));
         IERC20(lpToken).safeTransferFrom(msg.sender, address(this), amount);
+        uint256 received = IERC20(lpToken).balanceOf(address(this)) - balanceBefore;
+        // Fee-on-transfer tokens deliver less than `amount`. Record what actually arrived
+        // so a later unlock cannot pull another user's deposit.
+        require(received > 0, "LPLocker: nothing received");
 
         lockId = locks.length;
         locks.push(LockInfo({
             lpToken:   lpToken,
-            amount:    amount,
+            amount:    received,
             unlockAt:  unlockAt,
             owner:     msg.sender,
             withdrawn: false
         }));
         _locksByOwner[msg.sender].push(lockId);
 
-        emit Locked(lockId, msg.sender, lpToken, amount, unlockAt);
+        emit Locked(lockId, msg.sender, lpToken, received, unlockAt);
+    }
+
+    /**
+     * @notice Push a lock further into the future. Locks cannot be shortened.
+     */
+    function extendLock(uint256 lockId, uint256 newUnlockAt) external nonReentrant {
+        require(lockId < locks.length, "LPLocker: invalid id");
+        LockInfo storage lk = locks[lockId];
+        require(lk.owner == msg.sender, "LPLocker: not owner");
+        require(!lk.withdrawn, "LPLocker: already withdrawn");
+        require(newUnlockAt > lk.unlockAt, "LPLocker: not extended");
+        lk.unlockAt = newUnlockAt;
+        emit LockExtended(lockId, newUnlockAt);
+    }
+
+    /**
+     * @notice Transfer a lock to a new owner. The unlock time does not change.
+     */
+    function transferLock(uint256 lockId, address newOwner) external nonReentrant {
+        require(newOwner != address(0), "LPLocker: zero owner");
+        require(lockId < locks.length, "LPLocker: invalid id");
+        LockInfo storage lk = locks[lockId];
+        require(lk.owner == msg.sender, "LPLocker: not owner");
+        require(!lk.withdrawn, "LPLocker: already withdrawn");
+        require(newOwner != msg.sender, "LPLocker: same owner");
+
+        address previous = lk.owner;
+        lk.owner = newOwner;
+        _removeLockId(previous, lockId);
+        _locksByOwner[newOwner].push(lockId);
+        emit LockTransferred(lockId, previous, newOwner);
     }
 
     /**
@@ -123,5 +162,17 @@ contract LPLocker is ReentrancyGuard {
     /// @notice Total number of locks ever created (includes withdrawn).
     function totalLocks() external view returns (uint256) {
         return locks.length;
+    }
+
+    function _removeLockId(address owner_, uint256 lockId) internal {
+        uint256[] storage ids = _locksByOwner[owner_];
+        uint256 len = ids.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (ids[i] == lockId) {
+                ids[i] = ids[len - 1];
+                ids.pop();
+                return;
+            }
+        }
     }
 }

@@ -10,6 +10,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useChainId, useAccount, useReadContract, useWriteContract } from "wagmi";
 import { parseEther } from "viem";
+import { CANONICAL_ROUTERS } from "@/lib/canonicalDex";
 
 // Per-chain DEX config
 const SWAP_DEADLINE_SECONDS = 300; // 5 minutes
@@ -105,17 +106,7 @@ const DEXES: DexConfig[] = [
 const inputCls =
   "block w-full rounded-lg border border-dark-border bg-dark-muted px-3 py-2.5 text-sm text-white placeholder-gray-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500";
 
-// ─── Uniswap V2 router addresses per chain ────────────────────────────────────
-const UNISWAP_V2_ROUTERS: Record<number, `0x${string}`> = {
-  1:        "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-  11155111: "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-  56:       "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-  97:       "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
-  137:      "0xa5E0829CaCEd8fFDD4De3c43696c57F7D7A678ff",
-  42161:    "0x1b02dA8Cb0d097eB8D57A175b88c7D8b47997506",
-  8453:     "0x4752ba5DBc23f44D87826276BF6Fd6b1C372aD24",
-  43114:    "0x60aE616a2155Ee3d9A68541Ba4544862310933d4",
-};
+// Same registry the pump curve uses. Chains with no entry have no verified V2 router.
 
 const UNISWAP_V2_ABI = [
   {
@@ -205,7 +196,7 @@ export function SwapWidget() {
     debounceRef.current = setTimeout(() => setDebouncedAmountIn(val), 500);
   }, []);
 
-  const routerAddress = UNISWAP_V2_ROUTERS[chainId];
+  const routerAddress = CANONICAL_ROUTERS[chainId];
   const isEthToToken  = swapDirection === "ethToToken";
 
   // Build swap path
@@ -241,12 +232,20 @@ export function SwapWidget() {
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
   async function handleSwap() {
-    if (!routerAddress || !address || amountInWei === 0n) return;
+    if (!address || amountInWei === 0n) return;
+    if (!routerAddress) {
+      setSwapError("No swap router is configured for this chain.");
+      return;
+    }
+    if (!estimatedOut || estimatedOut === 0n) {
+      setSwapError("Wait for a price quote. A swap without a minimum would accept any output.");
+      return;
+    }
     setSwapStatus("idle");
     setSwapError(null);
 
     const deadline = BigInt(Math.floor(Date.now() / 1000) + SWAP_DEADLINE_SECONDS);
-    const amountOutMin = estimatedOut ? (estimatedOut * 99n) / 100n : 0n; // 1% slippage
+    const amountOutMin = (estimatedOut * 99n) / 100n;
 
     try {
       if (isEthToToken) {

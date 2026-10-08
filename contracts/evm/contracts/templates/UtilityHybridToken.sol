@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
+import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -30,6 +31,8 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
     // ─── Team wallet transparency ─────────────────────────────────────────────
     uint16 public teamWalletCapBps; // max % of supply any single address can hold
     mapping(address => bool) public isExcludedFromCap; // team / LP / staking contract
+    mapping(address => bool) private _preStakeCapExclusion;
+    mapping(address => bool) private _capExclusionStored;
 
     // ─── Staking ──────────────────────────────────────────────────────────────
     uint16  public rewardRateBps;   // reward per day in bps of staked amount
@@ -51,6 +54,7 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
         uint256 votesAgainst;
         uint256 endTime;
         bool    executed;
+        uint256 createdAt;
     }
     Proposal[] public proposals;
     mapping(uint256 => mapping(address => bool)) public hasVoted;
@@ -60,6 +64,8 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
     event Unstaked(address indexed user, uint256 amount);
     event RewardsClaimed(address indexed user, uint256 amount);
     event RewardPoolFunded(uint256 amount);
+    event RewardRateUpdated(uint16 bps);
+    event BurnBpsUpdated(uint16 bps);
     event ProposalCreated(uint256 indexed id, string description, uint256 endTime);
     event Voted(uint256 indexed proposalId, address indexed voter, bool support, uint256 weight);
 
@@ -103,7 +109,15 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
     // ─── Auto-burn on transfer ────────────────────────────────────────────────
 
     function _update(address from, address to, uint256 amount) internal override {
-        if (from == address(0) || to == address(0) || burnBps == 0) {
+        // Staking, unstaking, rewards, and pool funding must move the exact amount.
+        // Burning those legs both traps principal and lets reward claims spend staked tokens.
+        if (
+            from == address(0) ||
+            to == address(0) ||
+            from == address(this) ||
+            to == address(this) ||
+            burnBps == 0
+        ) {
             super._update(from, to, amount);
             _enforceTeamCap(to);
             return;
@@ -129,8 +143,13 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
     function stake(uint256 amount) external {
         require(amount > 0, "UtilityHybridToken: zero amount");
         _settlePending(msg.sender);
+        if (stakes[msg.sender].amount == 0) {
+            _preStakeCapExclusion[msg.sender] = isExcludedFromCap[msg.sender];
+            _capExclusionStored[msg.sender] = true;
+        }
         _transfer(msg.sender, address(this), amount);
         stakes[msg.sender].amount    += amount;
+        // Reset on every top-up so a same-transaction flash stake cannot vote.
         stakes[msg.sender].stakedAt   = block.timestamp;
         stakes[msg.sender].lastClaimTime = block.timestamp;
         totalStaked += amount;
@@ -139,14 +158,22 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
 
     function unstake(uint256 amount) external {
         StakeInfo storage s = stakes[msg.sender];
+        require(amount > 0, "UtilityHybridToken: zero amount");
         require(s.amount >= amount, "UtilityHybridToken: insufficient stake");
         _settlePending(msg.sender);
         s.amount -= amount;
         totalStaked -= amount;
-        // Update exclusion AFTER transfer so the cap is not enforced mid-unstake,
-        // which would permanently trap funds for users who hold > teamWalletCapBps.
+        // Exempt the recipient for the transfer itself. Restoring the flag only
+        // after a full unstake keeps a partial position withdrawable if burns
+        // have shrunk the wallet cap below the staked balance.
+        isExcludedFromCap[msg.sender] = true;
         _transfer(address(this), msg.sender, amount);
-        isExcludedFromCap[msg.sender] = (s.amount > 0); // keep excluded while staking
+        if (s.amount == 0) {
+            isExcludedFromCap[msg.sender] = _capExclusionStored[msg.sender]
+                ? _preStakeCapExclusion[msg.sender]
+                : false;
+            _capExclusionStored[msg.sender] = false;
+        }
         emit Unstaked(msg.sender, amount);
     }
 
@@ -157,24 +184,27 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
         require(rewardPool >= pending,     "UtilityHybridToken: reward pool empty");
         stakes[msg.sender].pendingRewards = 0;
         rewardPool -= pending;
+        bool wasExcluded = isExcludedFromCap[msg.sender];
+        isExcludedFromCap[msg.sender] = true;
         _transfer(address(this), msg.sender, pending);
+        isExcludedFromCap[msg.sender] = wasExcluded;
         emit RewardsClaimed(msg.sender, pending);
     }
 
     function pendingRewards(address user) external view returns (uint256) {
         StakeInfo storage s = stakes[user];
         if (s.amount == 0) return s.pendingRewards;
-        uint256 elapsed = block.timestamp - s.lastClaimTime;
-        uint256 earned  = (s.amount * rewardRateBps * elapsed) / (10_000 * 1 days);
-        return s.pendingRewards + earned;
+        return s.pendingRewards + _earned(s.amount, block.timestamp - s.lastClaimTime);
+    }
+
+    function _earned(uint256 amount, uint256 elapsed) internal view returns (uint256) {
+        return Math.mulDiv(amount, uint256(rewardRateBps) * elapsed, 10_000 * uint256(1 days));
     }
 
     function _settlePending(address user) internal {
         StakeInfo storage s = stakes[user];
-        if (s.amount > 0) {
-            uint256 elapsed = block.timestamp - s.lastClaimTime;
-            uint256 earned  = (s.amount * rewardRateBps * elapsed) / (10_000 * 1 days);
-            s.pendingRewards += earned;
+        if (s.amount > 0 && block.timestamp > s.lastClaimTime) {
+            s.pendingRewards += _earned(s.amount, block.timestamp - s.lastClaimTime);
         }
         s.lastClaimTime = block.timestamp;
     }
@@ -184,8 +214,9 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
     function createProposal(string calldata description, uint256 durationDays) external {
         require(balanceOf(msg.sender) + stakes[msg.sender].amount > 0,
                 "UtilityHybridToken: no governance power");
+        require(durationDays > 0 && durationDays <= 30, "UtilityHybridToken: bad duration");
         uint256 endTime = block.timestamp + (durationDays * 1 days);
-        proposals.push(Proposal(description, 0, 0, endTime, false));
+        proposals.push(Proposal(description, 0, 0, endTime, false, block.timestamp));
         emit ProposalCreated(proposals.length - 1, description, endTime);
     }
 
@@ -195,8 +226,11 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
         require(block.timestamp < p.endTime,   "UtilityHybridToken: voting ended");
         require(!hasVoted[proposalId][msg.sender], "UtilityHybridToken: already voted");
 
-        uint256 weight = balanceOf(msg.sender) + stakes[msg.sender].amount;
-        require(weight > 0, "UtilityHybridToken: no voting power");
+        // Wallet balance is flash-loanable. Only stake that existed before the
+        // proposal was created counts, which a same-transaction loan cannot satisfy.
+        require(stakes[msg.sender].amount > 0, "UtilityHybridToken: no voting power");
+        require(stakes[msg.sender].stakedAt < p.createdAt, "UtilityHybridToken: stake too new");
+        uint256 weight = stakes[msg.sender].amount;
 
         hasVoted[proposalId][msg.sender] = true;
         if (support) p.votesFor     += weight;
@@ -219,10 +253,12 @@ contract UtilityHybridToken is Initializable, ERC20Upgradeable, OwnableUpgradeab
     function setRewardRate(uint16 bps) external onlyOwner {
         require(bps <= 500, "UtilityHybridToken: reward > 5 %/day");
         rewardRateBps = bps;
+        emit RewardRateUpdated(bps);
     }
 
     function setBurnBps(uint16 bps) external onlyOwner {
         require(bps <= 500, "UtilityHybridToken: burn > 5 %");
         burnBps = bps;
+        emit BurnBpsUpdated(bps);
     }
 }

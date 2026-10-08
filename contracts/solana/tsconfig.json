@@ -7,7 +7,8 @@
     "target": "es6",
     "strict": true,
     "esModuleInterop": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "rootDir": "."
   },
   "include": ["tests/**/*.ts", "scripts/**/*.ts"]
 }
