@@ -28,6 +28,7 @@
     "deploy:avalanche": "hardhat run scripts/deploy.ts --network avalanche",
     "deploy:optimism": "hardhat run scripts/deploy.ts --network optimism",
     "deploy:optimismSepolia": "hardhat run scripts/deploy.ts --network optimismSepolia",
+    "dry-run:forks": "hardhat run scripts/dryRunForks.ts --network hardhat",
     "deploy:bridge:sepolia": "hardhat run scripts/deployBurnBridgeReceiver.ts --network sepolia",
     "deploy:bridge:bscTestnet": "hardhat run scripts/deployBurnBridgeReceiver.ts --network bscTestnet",
     "deploy:bridge:polygonMumbai": "hardhat run scripts/deployBurnBridgeReceiver.ts --network polygonMumbai",
@@ -48,6 +49,9 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "hh2",
     "@openzeppelin/contracts": "^5.6.1",
+    "@uniswap/lib": "4.0.1-alpha",
+    "@uniswap/v2-core": "1.0.1",
+    "@uniswap/v2-periphery": "1.1.0-beta.0",
     "hardhat": "^2.26.5",
     "solhint": "^6.2.1",
     "ts-node": "^10.9.2",

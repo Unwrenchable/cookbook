@@ -460,7 +460,7 @@ describe("Security fixes", function () {
         expect(got.wrappedNative).to.equal(venue.wrappedNative);
         expect(got.avaxNative).to.equal(venue.avaxNative);
       }
-      for (const chainId of [31337, 80001, 80002, 421614, 84532, 11155420]) {
+      for (const chainId of [31337, 80001, 130, 81457, 80094, 999, 146, 100, 25, 42220, 59144, 534352, 324, 5000, 480]) {
         const got = await harness.venue(chainId);
         expect(got.router).to.equal(ethers.ZeroAddress);
         expect(got.dexFactory).to.equal(ethers.ZeroAddress);

@@ -1,126 +1,106 @@
-import { ethers, network } from "hardhat";
+/**
+ * One-command deploy for a catalog network.
+ *
+ *   pnpm deploy:sepolia
+ *   VERIFY=1 pnpm deploy:baseSepolia
+ *   CONFIRM_MAINNET=yes-deploy-mainnet CONFIRM_NETWORK=base FEE_RECIPIENT=0xMultisig pnpm deploy:base
+ *
+ * Does not broadcast unless you run it. Mainnet also requires the confirm flags in
+ * docs/MAINNET_CHECKLIST.md. Addresses are written under deployments/ (gitignored)
+ * and printed as frontend env lines.
+ */
+import { ethers, network, run } from "hardhat";
+import { assertBroadcastAllowed, normalizeEmitter } from "./mainnetGuard";
+import { networkByName } from "./networkCatalog";
+import { deployGoonforge, frontendEnvLines, writeDeploymentFiles, type DeployResult } from "./deployStack";
+
+function launchFeeWei(): bigint {
+  const raw = process.env.LAUNCH_FEE?.trim();
+  const fee = raw ? ethers.parseEther(raw) : ethers.parseEther("0.001");
+  if (fee > ethers.parseEther("1")) {
+    throw new Error("LAUNCH_FEE is above the 1 ether factory cap.");
+  }
+  return fee;
+}
+
+async function verifyOne(address: string, constructorArguments: unknown[]): Promise<void> {
+  try {
+    await run("verify:verify", { address, constructorArguments });
+    console.log(`  verified ${address}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.log(`  verify skipped for ${address}: ${message.split("\n")[0]}`);
+  }
+}
+
+async function verifyAll(result: DeployResult): Promise<void> {
+  console.log("\nVerifying our contracts (the Uniswap bytecode is the published npm artifact)...");
+  for (const address of [...Object.values(result.implementations), result.lpLocker]) {
+    await verifyOne(address, []);
+  }
+  await verifyOne(result.tokenFactory, result.factoryArgs);
+  await verifyOne(result.bridgeToken, result.bridgeTokenArgs);
+  await verifyOne(
+    result.burnBridgeReceiver,
+    result.receiverArgs.map((v) => (typeof v === "bigint" ? v.toString() : v))
+  );
+}
 
 async function main() {
+  const netName = network.name;
+  if (netName === "hardhat" || netName === "localhost") {
+    throw new Error(
+      "Refusing a local Hardhat deploy. Graduation reads block.chainid, which is 31337 here and has no router. " +
+        "Use pnpm dry-run:forks for a local proof, or deploy to a catalog network."
+    );
+  }
+
+  const spec = networkByName(netName);
+  if (spec.unavailable) throw new Error(spec.unavailable);
+
   const [deployer] = await ethers.getSigners();
-  console.log(`\nDeploying GOONFORGE contracts on network: ${network.name}`);
+  const feeRecipient = (process.env.FEE_RECIPIENT?.trim() || (spec.isMainnet ? "" : deployer.address));
+  const emitter = normalizeEmitter(process.env.SOLANA_EMITTER);
+  assertBroadcastAllowed({
+    networkName: spec.name,
+    isMainnet: spec.isMainnet,
+    emitter,
+    feeRecipient,
+    deployer: deployer.address,
+  });
+
+  const rpcChain = await ethers.provider.getNetwork();
+  if (Number(rpcChain.chainId) !== spec.chainId) {
+    throw new Error(`Connected chain ${rpcChain.chainId} is not ${spec.name} (${spec.chainId}).`);
+  }
+
+  console.log(`\nDeploying GOONFORGE on ${spec.name} (${spec.chainId})`);
   console.log(`Deployer: ${deployer.address}`);
-  console.log(`Balance:  ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))} ETH\n`);
+  console.log(`Balance:  ${ethers.formatEther(await ethers.provider.getBalance(deployer.address))}`);
+  if (spec.testnetDex) {
+    console.log("This network has no publisher V2 router. Deploying the pinned Uniswap V2 bytecode first.");
+  }
 
-  // ─── 1. Deploy template implementations ───────────────────────────────────
-  console.log("Deploying template implementations...");
+  const result = await deployGoonforge(deployer, spec, {
+    launchFee: launchFeeWei(),
+    feeRecipient,
+    solanaEmitter: emitter,
+    mintRatio: BigInt(process.env.MINT_RATIO ?? "1000000000"),
+    bridgeTokenName: process.env.BRIDGE_TOKEN_NAME ?? "GoonForge Bridged Token",
+    bridgeTokenSymbol: process.env.BRIDGE_TOKEN_SYMBOL ?? "gBRIDGE",
+  });
 
-  const StandardERC20Factory = await ethers.getContractFactory("StandardERC20");
-  const standardImpl = await StandardERC20Factory.deploy();
-  await standardImpl.waitForDeployment();
-  console.log(`  StandardERC20      → ${await standardImpl.getAddress()}`);
+  const files = writeDeploymentFiles(result, spec);
+  console.log("\n=== Frontend env ===");
+  console.log(frontendEnvLines(result, spec));
+  console.log(`\nWrote ${files.jsonPath}`);
+  console.log(`Wrote ${files.envPath}`);
 
-  const TaxableERC20Factory = await ethers.getContractFactory("TaxableERC20");
-  const taxableImpl = await TaxableERC20Factory.deploy();
-  await taxableImpl.waitForDeployment();
-  console.log(`  TaxableERC20       → ${await taxableImpl.getAddress()}`);
-
-  const DeflationaryERC20Factory = await ethers.getContractFactory("DeflationaryERC20");
-  const deflationaryImpl = await DeflationaryERC20Factory.deploy();
-  await deflationaryImpl.waitForDeployment();
-  console.log(`  DeflationaryERC20  → ${await deflationaryImpl.getAddress()}`);
-
-  const ReflectionERC20Factory = await ethers.getContractFactory("ReflectionERC20");
-  const reflectionImpl = await ReflectionERC20Factory.deploy();
-  await reflectionImpl.waitForDeployment();
-  console.log(`  ReflectionERC20    → ${await reflectionImpl.getAddress()}`);
-
-  const BondingCurveFactory = await ethers.getContractFactory("BondingCurveToken");
-  const bondingCurveImpl = await BondingCurveFactory.deploy();
-  await bondingCurveImpl.waitForDeployment();
-  console.log(`  BondingCurveToken  → ${await bondingCurveImpl.getAddress()}`);
-
-  // ─── Meta-narrative templates ──────────────────────────────────────────────
-
-  const AIAgentFactory = await ethers.getContractFactory("AIAgentToken");
-  const aiAgentImpl = await AIAgentFactory.deploy();
-  await aiAgentImpl.waitForDeployment();
-  console.log(`  AIAgentToken       → ${await aiAgentImpl.getAddress()}`);
-
-  const PolitiFiFactory = await ethers.getContractFactory("PolitiFiToken");
-  const politiFiImpl = await PolitiFiFactory.deploy();
-  await politiFiImpl.waitForDeployment();
-  console.log(`  PolitiFiToken      → ${await politiFiImpl.getAddress()}`);
-
-  const UtilityHybridFactory = await ethers.getContractFactory("UtilityHybridToken");
-  const utilityHybridImpl = await UtilityHybridFactory.deploy();
-  await utilityHybridImpl.waitForDeployment();
-  console.log(`  UtilityHybridToken → ${await utilityHybridImpl.getAddress()}`);
-
-  const PumpMigrateFactory = await ethers.getContractFactory("PumpMigrateToken");
-  const pumpMigrateImpl = await PumpMigrateFactory.deploy();
-  await pumpMigrateImpl.waitForDeployment();
-  console.log(`  PumpMigrateToken   → ${await pumpMigrateImpl.getAddress()}`);
-
-  // ─── 2. Deploy the factory ────────────────────────────────────────────────
-  console.log("\nDeploying TokenFactory...");
-
-  // 0.001 ETH launch fee (adjust per chain)
-  const launchFee    = ethers.parseEther("0.001");
-  // ⚠️  Replace deployer.address with your treasury / multisig wallet before
-  // deploying to mainnet. Using the deployer key as the fee recipient means
-  // all fees accumulate in the same hot wallet used for deployment.
-  const feeRecipient = deployer.address; // TODO: replace with treasury wallet
-
-  const TokenFactoryContract = await ethers.getContractFactory("TokenFactory");
-  const factory = await TokenFactoryContract.deploy(
-    await standardImpl.getAddress(),
-    await taxableImpl.getAddress(),
-    await deflationaryImpl.getAddress(),
-    await reflectionImpl.getAddress(),
-    await bondingCurveImpl.getAddress(),
-    await aiAgentImpl.getAddress(),
-    await politiFiImpl.getAddress(),
-    await utilityHybridImpl.getAddress(),
-    await pumpMigrateImpl.getAddress(),
-    launchFee,
-    feeRecipient
-  );
-  await factory.waitForDeployment();
-
-  const factoryAddress = await factory.getAddress();
-  console.log(`  TokenFactory       → ${factoryAddress}`);
-  console.log(`  Launch fee         : ${ethers.formatEther(launchFee)} ETH`);
-  console.log(`  Fee recipient      : ${feeRecipient}`);
-  console.log(
-    `  Pump router        : CanonicalDex for chain ${network.config.chainId}. No router argument.`
-  );
-
-  // ─── 3. Deploy the LP Locker ──────────────────────────────────────────────
-  console.log("\nDeploying LPLocker...");
-
-  const LPLockerFactory = await ethers.getContractFactory("LPLocker");
-  const lpLocker = await LPLockerFactory.deploy();
-  await lpLocker.waitForDeployment();
-
-  const lpLockerAddress = await lpLocker.getAddress();
-  console.log(`  LPLocker           → ${lpLockerAddress}`);
-
-  // ─── 4. Summary ───────────────────────────────────────────────────────────
-  console.log("\n=== GOONFORGE Deployment Summary ===");
-  console.log(JSON.stringify({
-    network:         network.name,
-    deployer:        deployer.address,
-    tokenFactory:    factoryAddress,
-    lpLocker:        lpLockerAddress,
-    implementations: {
-      standard:      await standardImpl.getAddress(),
-      taxable:       await taxableImpl.getAddress(),
-      deflationary:  await deflationaryImpl.getAddress(),
-      reflection:    await reflectionImpl.getAddress(),
-      bondingCurve:  await bondingCurveImpl.getAddress(),
-      aiAgent:       await aiAgentImpl.getAddress(),
-      politiFi:      await politiFiImpl.getAddress(),
-      utilityHybrid: await utilityHybridImpl.getAddress(),
-      pumpMigrate:   await pumpMigrateImpl.getAddress(),
-    },
-  }, null, 2));
-
-  console.log("\nAdd the addresses to frontend/.env.local and you're live on GOONFORGE.XYZ!");
+  if (process.env.VERIFY === "1") {
+    await verifyAll(result);
+  } else {
+    console.log("\nSet VERIFY=1 to submit our contracts to the explorer. The pinned DEX bytecode is not recompiled.");
+  }
 }
 
 main()

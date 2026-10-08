@@ -154,7 +154,7 @@ cd contracts/evm
 
 # 1) Configure secrets
 cp .env.example .env
-# Fill PRIVATE_KEY + ALCHEMY_API_KEY (+ optional explorer keys)
+# Fill PRIVATE_KEY + SOLANA_EMITTER (+ optional explorer keys and RPC overrides)
 
 # 2) Compile once
 pnpm compile
@@ -163,12 +163,11 @@ pnpm compile
 pnpm preflight:sepolia
 # or: pnpm preflight:bscTestnet | preflight:polygonAmoy | preflight:arbitrumSepolia | preflight:baseSepolia | preflight:optimismSepolia
 
-# 4) Deploy factory + implementations + LP locker
-pnpm deploy:sepolia
-
-# 5) (Optional) Deploy BurnBridgeReceiver
-pnpm deploy:bridge:sepolia
+# 4) Deploy implementations, factory, locker, bridge, and (where needed) the pinned testnet DEX
+SOLANA_EMITTER=0xYourRotatedProgramId pnpm deploy:sepolia
 ```
+
+The same script deploys the pinned Uniswap V2 bytecode on `polygonAmoy`, `arbitrumSepolia`, `baseSepolia`, and `optimismSepolia`. Mainnet commands require the flags in `docs/MAINNET_CHECKLIST.md`. Chain TVL and DEX volume for what was kept and what was rejected are in `docs/CHAIN_SUPPORT.md`.
 
 If preflight fails, fix missing env vars/funding first; deployment should only be run after preflight passes.
 
@@ -238,7 +237,7 @@ PINATA_JWT=...                      # IPFS metadata upload
 - Factory enforces: total fees ≤ 30%, owner ≠ zero address, supply > 0.
 - `LPLocker` uses `ReentrancyGuard` and `SafeERC20` on all state-changing paths.
 - `BurnBridgeReceiver.receiveMessage()` verifies a Wormhole VAA. There is no trusted-relayer mint path. See [`docs/CROSS_CHAIN_BURN_BRIDGE.md`](docs/CROSS_CHAIN_BURN_BRIDGE.md).
-- Before mainnet deployment: set `feeRecipient` in `scripts/deploy.ts` to your treasury / multisig wallet (not the deployer key).
+- Before mainnet deployment: set `FEE_RECIPIENT` to your treasury multisig (not the deployer key) and set the confirm flags in `docs/MAINNET_CHECKLIST.md`.
 
 ---
 

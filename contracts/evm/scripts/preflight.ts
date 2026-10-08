@@ -25,11 +25,7 @@ async function main() {
   }
 
   if (!isLocal) {
-    requiredEnv(["PRIVATE_KEY"]);
-  }
-
-  if (["sepolia", "polygonAmoy", "arbitrumSepolia", "baseSepolia", "optimismSepolia"].includes(netName)) {
-    requiredEnv(["ALCHEMY_API_KEY"]);
+    requiredEnv(["PRIVATE_KEY", "SOLANA_EMITTER"]);
   }
 
   const provider = ethers.provider;

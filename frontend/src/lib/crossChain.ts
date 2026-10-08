@@ -16,13 +16,21 @@
 // ─── Wormhole chain IDs ───────────────────────────────────────────────────────
 
 export const WORMHOLE_CHAIN_IDS = {
-  solana:    1,
-  ethereum:  2,
-  bsc:       4,
-  polygon:   5,
-  avalanche: 6,
-  arbitrum:  23,
-  base:      30,
+  solana:           1,
+  ethereum:         2,
+  bsc:              4,
+  polygon:          5,
+  avalanche:        6,
+  arbitrum:         23,
+  optimism:         24,
+  base:             30,
+  // Replaced testnets have their own Wormhole ids. BSC testnet stays on 4.
+  // https://github.com/wormhole-foundation/wormhole/blob/main/sdk/js/src/utils/consts.ts
+  sepolia:          10002,
+  arbitrumSepolia:  10003,
+  baseSepolia:      10004,
+  optimismSepolia:  10005,
+  polygonAmoy:      10007,
 } as const;
 
 export type WormholeChainId = typeof WORMHOLE_CHAIN_IDS[keyof typeof WORMHOLE_CHAIN_IDS];
@@ -128,10 +136,19 @@ export const CROSS_CHAIN_TARGETS: CrossChainTarget[] = [
     wormholeCore:    "0x54a8e5f9c4CbA08F9943965859F6c34eAF03E26c",
     isTestnet:       false,
   },
+  {
+    evmChainId:      10,
+    wormholeChainId: WORMHOLE_CHAIN_IDS.optimism,
+    name:            "OP Mainnet",
+    shortName:       "optimism",
+    receiverAddress: (process.env.NEXT_PUBLIC_RECEIVER_OPTIMISM as `0x${string}`) || "",
+    wormholeCore:    "0xEe91C335eab126dF5fDB3797EA9d6aD93aeC9722",
+    isTestnet:       false,
+  },
   // ── Testnets ─────────────────────────────────────────────────────────────────
   {
     evmChainId:      11155111,
-    wormholeChainId: WORMHOLE_CHAIN_IDS.ethereum,
+    wormholeChainId: WORMHOLE_CHAIN_IDS.sepolia,
     name:            "Ethereum Sepolia",
     shortName:       "sepolia",
     receiverAddress: (process.env.NEXT_PUBLIC_RECEIVER_SEPOLIA as `0x${string}`) || "",
@@ -144,7 +161,43 @@ export const CROSS_CHAIN_TARGETS: CrossChainTarget[] = [
     name:            "BNB Testnet",
     shortName:       "bscTestnet",
     receiverAddress: (process.env.NEXT_PUBLIC_RECEIVER_BSC_TESTNET as `0x${string}`) || "",
-    wormholeCore:    "0x68605AD7b15c732a30b1BbC62BE8425E9Bb182E9",
+    wormholeCore:    "0x68605AD7b15c732a30b1BbC62BE8F2A509D74b4D",
+    isTestnet:       true,
+  },
+  {
+    evmChainId:      80002,
+    wormholeChainId: WORMHOLE_CHAIN_IDS.polygonAmoy,
+    name:            "Polygon Amoy",
+    shortName:       "polygonAmoy",
+    receiverAddress: (process.env.NEXT_PUBLIC_RECEIVER_POLYGON_AMOY as `0x${string}`) || "",
+    wormholeCore:    "0x6b9C8671cdDC8dEab9c719bB87cBd3e782bA6a35",
+    isTestnet:       true,
+  },
+  {
+    evmChainId:      421614,
+    wormholeChainId: WORMHOLE_CHAIN_IDS.arbitrumSepolia,
+    name:            "Arbitrum Sepolia",
+    shortName:       "arbitrumSepolia",
+    receiverAddress: (process.env.NEXT_PUBLIC_RECEIVER_ARB_SEPOLIA as `0x${string}`) || "",
+    wormholeCore:    "0x6b9C8671cdDC8dEab9c719bB87cBd3e782bA6a35",
+    isTestnet:       true,
+  },
+  {
+    evmChainId:      84532,
+    wormholeChainId: WORMHOLE_CHAIN_IDS.baseSepolia,
+    name:            "Base Sepolia",
+    shortName:       "baseSepolia",
+    receiverAddress: (process.env.NEXT_PUBLIC_RECEIVER_BASE_SEPOLIA as `0x${string}`) || "",
+    wormholeCore:    "0x79A1027a6A159502049F10906D333EC57E95F083",
+    isTestnet:       true,
+  },
+  {
+    evmChainId:      11155420,
+    wormholeChainId: WORMHOLE_CHAIN_IDS.optimismSepolia,
+    name:            "OP Sepolia",
+    shortName:       "optimismSepolia",
+    receiverAddress: (process.env.NEXT_PUBLIC_RECEIVER_OP_SEPOLIA as `0x${string}`) || "",
+    wormholeCore:    "0x31377888146f3253211EFEf5c676D41ECe7D58Fe",
     isTestnet:       true,
   },
 ];
