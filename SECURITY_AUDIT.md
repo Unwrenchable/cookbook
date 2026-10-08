@@ -266,9 +266,9 @@ Admin delay: default 24 hours, floor 1 hour, cap 30 days. Changing the delay is 
 
 API env (empty means the in-memory limiter): `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`, or `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Documented with empty values in `frontend/.env.example`.
 
-Solana production path is `burn_and_post`. The emitter PDA seeds are `["emitter"]`. The Wormhole message account is a fresh keypair the client partial-signs. The client reads the bridge fee at byte offset 16 and transfers it to the fee collector in the same transaction when the fee is non-zero. `burn_and_bridge` is not in the program.
+Solana production path is `burn_and_post`. The emitter PDA seeds are `["emitter"]`. Wormhole core `post_message` sets `emitter_address` from that signer account, so `SOLANA_EMITTER` is the PDA as bytes32 (`pnpm emitter <programId>`), not the program id. Allowlisting the program id makes every real VAA fail `emitter not allowed`. The Wormhole message account is a fresh keypair the client partial-signs. The client reads the bridge fee at byte offset 16 and transfers it to the fee collector in the same transaction when the fee is non-zero. `burn_and_bridge` is not in the program.
 
-Rotate the program id before any deploy. Do not commit a replacement key. The id `2sAka7jCkP71LbKk1MpELxFpjSHjScQk1aStrDt4Pnnf` is in git history.
+Rotate the program id before any deploy. Do not commit a replacement key. The id `2sAka7jCkP71LbKk1MpELxFpjSHjScQk1aStrDt4Pnnf` is in git history. The deploy guard also rejects that program's emitter PDA.
 
 ## Remaining risks
 

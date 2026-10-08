@@ -129,7 +129,7 @@ pnpm deploy:arbitrumSepolia
 pnpm deploy:baseSepolia
 ```
 
-Set `SOLANA_EMITTER` in `contracts/evm/.env` to the rotated burn-bridge program id (32-byte hex). The script rejects a zero emitter and the leaked program id. Optional: `FEE_RECIPIENT` (defaults to the deployer on testnet), `LAUNCH_FEE` (default `0.001`, cap 1 ether), and a `*_RPC_URL` override. Public RPC fallbacks are in `hardhat.config.ts`.
+Set `SOLANA_EMITTER` in `contracts/evm/.env` to the rotated burn-bridge `["emitter"]` PDA (32-byte hex), not the program id. From the repo root, `pnpm emitter <programIdBase58>` prints it. The script rejects a zero emitter, the leaked program id, and that program's emitter PDA. Optional: `FEE_RECIPIENT` (defaults to the deployer on testnet), `LAUNCH_FEE` (default `0.001`, cap 1 ether), and a `*_RPC_URL` override. Public RPC fallbacks are in `hardhat.config.ts`.
 
 ```bash
 # Optimism Sepolia
@@ -341,7 +341,7 @@ Read `docs/MAINNET_CHECKLIST.md` first. The script refuses to broadcast unless b
 ```bash
 # From contracts/evm/
 CONFIRM_MAINNET=yes-deploy-mainnet CONFIRM_NETWORK=mainnet \
-  FEE_RECIPIENT=0xYourMultisig SOLANA_EMITTER=0xYourRotatedProgramId \
+  FEE_RECIPIENT=0xYourMultisig SOLANA_EMITTER=0xYourEmitterPda \
   pnpm deploy:mainnet
 
 # Same flags, with CONFIRM_NETWORK set to the Hardhat name:
@@ -427,7 +427,7 @@ cd contracts/solana
 anchor build
 anchor deploy --provider.cluster devnet
 
-# 2. Set SOLANA_EMITTER in contracts/evm/.env (program ID as bytes32 hex)
+# 2. Set SOLANA_EMITTER in contracts/evm/.env to the ["emitter"] PDA (pnpm emitter <programId>)
 # 3. Set MINTABLE_TOKEN (the ERC20 that will be minted after bridge calls)
 
 # 4. Deploy BurnBridgeReceiver on each EVM chain (testnets first)

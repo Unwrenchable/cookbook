@@ -58,7 +58,7 @@ export interface WormholeVAA {
   emitterAddr:  string;
   /** hex-encoded full VAA bytes */
   vaaBytes:     `0x${string}`;
-  /** decoded Wormhole payload used by the trusted-relayer path */
+  /** 114-byte burn payload copied out of the VAA body */
   payloadBytes: `0x${string}`;
   txHash:       string;
 }
@@ -143,12 +143,12 @@ export function useSolanaLaunch() {
           `\nSolana tx: ${signature}`
         );
 
-        // ── Step 2: Wait for Wormhole VAA / relayer payload ─────────────────
+        // ── Step 2: Wait for the Wormhole VAA ───────────────────────────────
         setState((s) => ({ ...s, step: "waiting_for_vaa" }));
         const vaas = await pollForVAAs(signature, params, params.isTestnet);
         setState((s) => ({ ...s, vaas }));
 
-        // ── Step 3: Relay the decoded bridge payload to each selected chain ──
+        // ── Step 3: Wallet submits the VAA to receiveMessage on each chain ──
         setState((s) => ({ ...s, step: "submitting_vaa" }));
         const evmResults: { chainName: string; txHash: string }[] = [];
 
@@ -174,7 +174,7 @@ export function useSolanaLaunch() {
             const evmTxHash = await submitVAAToEVM(bridgeProof, target);
             evmResults.push({ chainName: target.name, txHash: evmTxHash });
           } catch (err) {
-            console.error(`[useSolanaLaunch] Failed to relay burn proof to ${target.name}:`, err);
+            console.error(`[useSolanaLaunch] Failed to submit VAA to ${target.name}:`, err);
             evmResults.push({ chainName: target.name, txHash: "" });
           }
         }
@@ -442,7 +442,7 @@ async function pollForVAAs(
 }
 
 /**
- * Submit the decoded bridge payload to BurnBridgeReceiver on the target EVM chain.
+ * The user's wallet submits the VAA to BurnBridgeReceiver.receiveMessage.
  * Uses window.ethereum (MetaMask / RainbowKit injected wallet) via viem.
  */
 async function submitVAAToEVM(
@@ -477,7 +477,7 @@ async function submitVAAToEVM(
       chain:        null,
     });
 
-    console.log(`[useSolanaLaunch] Bridge payload relayed to ${target.name}: ${txHash}`);
+    console.log(`[useSolanaLaunch] VAA submitted to ${target.name}: ${txHash}`);
     return txHash;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

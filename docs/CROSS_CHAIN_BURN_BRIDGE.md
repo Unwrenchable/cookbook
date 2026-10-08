@@ -11,7 +11,7 @@ This creates a unique multi-chain token economics model where:
 
 > ⚠️ **Production Readiness Status**
 >
-> `receiveMessage` calls Wormhole core `parseAndVerifyVM`, checks the emitter allowlist, and rejects a replay of the VAA hash or sequence. There is no trusted-relayer mint path. The Solana program posts the burn through `burn_and_post` (Wormhole `post_message`, instruction byte 1). The old `burn_and_bridge` instruction is not in the program, so a client that still sends it does not burn tokens. Rotate the program id before any deploy. Admin changes on the receiver wait 24 hours. Pump graduation uses the canonical V2 router hardcoded for `block.chainid`. There is no admin or creator setter.
+> `receiveMessage` calls Wormhole core `parseAndVerifyVM`, checks the emitter allowlist, and rejects a replay of the VAA hash or sequence. There is no trusted-relayer mint path. The Solana program posts the burn through `burn_and_post` (Wormhole `post_message`, instruction byte 1), signed by its `["emitter"]` PDA. Wormhole stores that PDA as `emitter_address`, so `SOLANA_EMITTER` must be the PDA from `pnpm emitter <programId>`, not the program id. The old `burn_and_bridge` instruction is not in the program, so a client that still sends it does not burn tokens. Rotate the program id before any deploy. Admin changes on the receiver wait 24 hours. Pump graduation uses the canonical V2 router hardcoded for `block.chainid`. There is no admin or creator setter.
 
 ---
 
@@ -39,8 +39,8 @@ User (Phantom Wallet + MetaMask)
     │
     ├─ 6. Wormhole guardians sign the VAA (~13 s mainnet)
     │
-    └─ 7. Auto-relayer (or user) submits VAA to BurnBridgeReceiver.sol
-               → Verifies VAA (emitter chain, emitter address, sequence)
+    └─ 7. The user's wallet submits the VAA to BurnBridgeReceiver.receiveMessage
+               → Verifies VAA (emitter chain, emitter PDA, sequence)
                → Replay protection (sequence tracking)
                → Mints ERC20 tokens to EVM recipient
                → Emits TokensActivated event
@@ -76,7 +76,7 @@ uint64   nonce               (8 bytes, big-endian)
 **Security features:**
 - VAA verification via `IWormhole(wormholeCore).parseAndVerifyVM()`
 - Replay protection via `processedMessages[messageKey]` mapping
-- Emitter validation (only the configured Solana program can send)
+- Emitter validation (only the configured Solana `["emitter"]` PDA can send)
 - Reentrancy guard
 
 ---
@@ -141,9 +141,7 @@ That's it. No contract redeployment needed anywhere else.
 GET https://api.wormholescan.io/api/v1/vaas/1/{emitterAddress}/{sequence}
 ```
 
-**Auto-relayer:** The Wormhole team runs a free automatic relayer for standard token transfers. For custom payloads like ours, you need either:
-1. A custom relayer (see `scripts/relayer.ts` – to be added)
-2. The user submits the VAA manually via the TokenForge UI
+`emitterAddress` is the burn-bridge `["emitter"]` PDA. The connected wallet submits that VAA to `receiveMessage`. Wormhole's automatic relayer covers standard token transfers, not this custom payload.
 
 ---
 

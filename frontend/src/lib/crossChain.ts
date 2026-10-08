@@ -209,7 +209,7 @@ export function getTargetByEvmChainId(id: number): CrossChainTarget | undefined 
   return CROSS_CHAIN_TARGETS.find((t) => t.evmChainId === id);
 }
 
-// ─── Wormhole REST API (used by the auto-relayer fetch) ───────────────────────
+// ─── WormholeScan API (VAA lookup before the wallet calls receiveMessage) ────
 
 export const WORMHOLE_API = {
   mainnet: "https://api.wormholescan.io",

@@ -153,7 +153,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
         <p className="font-semibold text-base mb-1 text-blue-200">🌉 Solana-First Cross-Chain Launch</p>
         <p>
           Burn SPL tokens on Solana to <strong className="text-blue-200">activate</strong> ERC20 minting on EVM chains.
-          Wormhole carries the proof, and today&apos;s UI uses the trusted-relayer path while the direct VAA receiver is being hardened.
+          Wormhole carries the proof. Your wallet then submits that VAA to BurnBridgeReceiver.receiveMessage.
           More you burn, more chains you unlock.
         </p>
       </div>
@@ -174,7 +174,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
                 ? "The Solana program ID is still the placeholder value. Deploy the Anchor program and set NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID before using mainnet burns."
                 : armedTargets.length === 0
                 ? "No EVM receiver contracts are configured for the selected environment yet. Add the NEXT_PUBLIC_RECEIVER_* envs to enable chain activation."
-                : "The route is configured, but EVM minting still uses the trusted-relayer beta path until full Wormhole receiveMessage() verification is enabled."}
+                : "The route is configured. Your wallet submits the Wormhole VAA to receiveMessage on each selected chain."}
             </p>
           </div>
           <div className="rounded-lg border border-current/20 bg-black/10 px-3 py-2 text-[11px] font-mono break-all">
@@ -186,7 +186,7 @@ export function SolanaLaunchPanel({ isTestnet }: Props) {
             <span className="font-semibold">Live receivers:</span> {armedTargets.length}/{targets.length}
           </div>
           <div className="rounded-lg border border-current/15 bg-black/10 px-3 py-2">
-            <span className="font-semibold">Mode:</span> {bridgeIsArmed ? "Trusted-relayer beta" : "Configuration pending"}
+            <span className="font-semibold">Mode:</span> {bridgeIsArmed ? "Wallet submits VAA" : "Configuration pending"}
           </div>
         </div>
       </div>
