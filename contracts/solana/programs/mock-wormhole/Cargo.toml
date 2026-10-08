@@ -1,0 +1,19 @@
+[workspace]
+
+[package]
+name = "mock-wormhole"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "mock_wormhole"
+
+[dependencies]
+solana-program = "=1.18.26"
+
+# The SBF toolchain's Cargo 1.75 cannot parse edition-2024 crates.
+# solana-program 1.18 allows borsh ^1.2.1, which now resolves past that.
+borsh = "=1.5.1"
+zeroize_derive = "=1.4.2"

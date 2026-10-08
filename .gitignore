@@ -30,3 +30,4 @@ coverage/
 contracts/solana/.anchor/
 contracts/solana/.anchor/test-ledger/
 contracts/solana/target/
+contracts/solana/programs/**/target/

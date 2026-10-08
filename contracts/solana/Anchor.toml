@@ -17,3 +17,9 @@ wallet = "~/.config/solana/id.json"
 
 [scripts]
 test = "npx ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
+
+# Local tests load a mock at the Wormhole devnet core id. The bridge program
+# still rejects any other program id.
+[[test.genesis]]
+address = "3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5"
+program = "programs/mock-wormhole/target/deploy/mock_wormhole.so"

@@ -23,6 +23,10 @@ interface IDexFactory {
     function getPair(address tokenA, address tokenB) external view returns (address);
 }
 
+interface ILaunchFactory {
+    function dexRouter() external view returns (address);
+}
+
 /**
  * @title PumpMigrateToken
  * @notice Bonding curve token that automatically "graduates" to CEX-ready status
@@ -35,9 +39,10 @@ interface IDexFactory {
  *  1. Token launches with a virtual token reserve (a supply offset, not a wei balance).
  *  2. Users buy via `buy()` — price increases linearly with supply.
  *  3. When `ethReserve >= graduationThreshold` the same buy migrates the reserve
- *     and an equal token amount into the configured Uniswap V2-style router.
+ *     and an equal token amount into the factory's canonical router.
  *  4. LP tokens are minted to the burn address. Curve trading stays halted.
- *  5. The router is locked once trading has started, and migration can run once.
+ *  5. The token creator cannot choose the router. Migration reads it from the
+ *     launch factory at graduation, and migration can run once.
  *
  * This matches the pump.fun → Raydium migration pattern on Solana,
  * adapted for EVM (pump.fun → Uniswap/PancakeSwap).
@@ -66,8 +71,11 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
     uint16  public minMigrateEthBps;
     uint16  public constant MAX_TRADING_FEE_BPS = 300;
 
-    // ─── DEX config (set by owner after graduation) ───────────────────────────
-    address public dexRouter;        // Uniswap / PancakeSwap router
+    // ─── DEX config ───────────────────────────────────────────────────────────
+    /// @notice Factory that created this clone. Graduation reads `dexRouter()` from it.
+    address public launchFactory;
+    /// @notice Router used at graduation. Written only inside `_migrate`.
+    address public dexRouter;
     address public liquidityPair;    // LP pair address after migration
     uint256 public lpTokensLocked;   // amount of LP tokens locked
 
@@ -139,6 +147,7 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
         basePrice            = 1e9;
         slope                = 1e3;
         minMigrateEthBps     = 9900;
+        launchFactory        = msg.sender;
     }
 
     function decimals() public view override returns (uint8) { return _tokenDecimals; }
@@ -228,9 +237,16 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
 
     // ─── Graduation ───────────────────────────────────────────────────────────
 
+    function _router() internal view returns (address router) {
+        router = ILaunchFactory(launchFactory).dexRouter();
+        require(router != address(0), "PumpMigrateToken: router not set");
+        require(IDexRouter(router).WETH() != address(0), "PumpMigrateToken: router missing WETH");
+        require(IDexRouter(router).factory() != address(0), "PumpMigrateToken: router missing factory");
+    }
+
     function _migrate() internal {
         require(!liquidityMigrated, "PumpMigrateToken: already migrated");
-        require(dexRouter != address(0), "PumpMigrateToken: router not set");
+        address router = _router();
 
         uint256 ethIn = ethReserve;
         uint256 supply = totalSupply();
@@ -241,13 +257,15 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
         liquidityMigrated = true;
         graduatedAt = block.timestamp;
         ethReserve = 0;
+        dexRouter = router;
+        emit DexRouterUpdated(router);
 
         _mint(address(this), supply);
-        _approve(address(this), dexRouter, supply);
+        _approve(address(this), router, supply);
 
         uint256 ethMin = (ethIn * minMigrateEthBps) / 10_000;
         uint256 tokenMin = (supply * 9900) / 10_000;
-        (uint256 usedToken, uint256 usedEth, uint256 liquidity) = IDexRouter(dexRouter).addLiquidityETH{
+        (uint256 usedToken, uint256 usedEth, uint256 liquidity) = IDexRouter(router).addLiquidityETH{
             value: ethIn
         }(
             address(this),
@@ -268,9 +286,9 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
             require(ok, "PumpMigrateToken: leftover failed");
         }
 
-        address pair = IDexFactory(IDexRouter(dexRouter).factory()).getPair(
+        address pair = IDexFactory(IDexRouter(router).factory()).getPair(
             address(this),
-            IDexRouter(dexRouter).WETH()
+            IDexRouter(router).WETH()
         );
         liquidityPair = pair;
         lpTokensLocked = liquidity;
@@ -295,16 +313,6 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
     }
 
     // ─── Owner controls ───────────────────────────────────────────────────────
-
-    function setDexRouter(address router) external onlyOwner {
-        require(!isGraduated, "PumpMigrateToken: already graduated");
-        require(dexRouter == address(0) || ethReserve == 0, "PumpMigrateToken: router locked");
-        require(router != address(0), "PumpMigrateToken: zero router");
-        require(IDexRouter(router).WETH() != address(0), "PumpMigrateToken: router missing WETH");
-        require(IDexRouter(router).factory() != address(0), "PumpMigrateToken: router missing factory");
-        dexRouter = router;
-        emit DexRouterUpdated(router);
-    }
 
     function setMinMigrateEthBps(uint16 bps) external onlyOwner {
         require(ethReserve == 0 && !isGraduated, "PumpMigrateToken: trading already started");

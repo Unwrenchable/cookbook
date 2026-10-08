@@ -38,11 +38,6 @@ export const MIN_BURN_ALL_CHAINS   = BigInt("1000000000000");
 // These are computed by the Anchor framework and embedded in each instruction call.
 // Run `anchor build` to regenerate; these are stable for the given instruction names.
 
-/** discriminator for `burn_and_bridge` — SHA256("global:burn_and_bridge")[0..8] */
-export const DISCRIMINATOR_BURN_AND_BRIDGE = Buffer.from([
-  0xbb, 0x09, 0xfc, 0xb7, 0x70, 0xe6, 0x54, 0x0e,
-]);
-
 /** discriminator for `burn_and_post` — SHA256("global:burn_and_post")[0..8] */
 export const DISCRIMINATOR_BURN_AND_POST = Buffer.from([
   0x50, 0xdf, 0x64, 0x14, 0x8e, 0x62, 0x18, 0x66,

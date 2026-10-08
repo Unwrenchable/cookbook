@@ -11,7 +11,7 @@ This creates a unique multi-chain token economics model where:
 
 > ⚠️ **Production Readiness Status**
 >
-> `receiveMessage` calls Wormhole core `parseAndVerifyVM`, checks the emitter allowlist, and rejects a replay of the VAA hash or sequence. There is no trusted-relayer mint path. The Solana program posts the burn through `burn_and_post` (Wormhole `post_message`, instruction byte 1). `burn_and_bridge` still burns and emits an event for the local Anchor suite; it does not create a VAA, so the EVM receiver will not mint for it. Rotate the program id before any deploy. Admin changes on the receiver wait 24 hours.
+> `receiveMessage` calls Wormhole core `parseAndVerifyVM`, checks the emitter allowlist, and rejects a replay of the VAA hash or sequence. There is no trusted-relayer mint path. The Solana program posts the burn through `burn_and_post` (Wormhole `post_message`, instruction byte 1). The old `burn_and_bridge` instruction is not in the program, so a client that still sends it does not burn tokens. Rotate the program id before any deploy. Admin changes on the receiver wait 24 hours. Pump graduation uses the factory's timelocked router, not one chosen by the token creator.
 
 ---
 
@@ -54,7 +54,7 @@ User (Phantom Wallet + MetaMask)
 
 **Anchor program** with instructions:
 - `initialize(evm_receivers)` — deployer sets up which EVM chains are supported
-- `burn_and_bridge(amount, target_chain_id, evm_recipient, consistency_level)` — core instruction
+- `burn_and_post(amount, target_chain_id, evm_recipient, consistency_level)` — burns and CPIs Wormhole `post_message`
 - `update_receivers(evm_receivers)` — admin can add/remove EVM chains
 
 **Payload format** (ABI-compatible with EVM receiver):

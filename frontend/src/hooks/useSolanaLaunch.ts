@@ -2,7 +2,7 @@
  * useSolanaLaunch.ts – Hook for the Solana-first cross-chain burn-to-activate flow.
  *
  * Steps:
- *  1. Build a `burnAndBridge` instruction via the Anchor SDK and send it.
+ *  1. Build a `burn_and_post` instruction and send it.
  *  2. Poll Wormhole Scan API for the signed VAA produced by the burn tx.
  *  3. Submit the VAA to BurnBridgeReceiver.sol on each target EVM chain via viem.
  *
@@ -209,7 +209,7 @@ export function useSolanaLaunch() {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Build and send the `burnAndBridge` Anchor instruction.
+ * Build and send the `burn_and_post` instruction.
  *
  * When the program ID is still the system-program placeholder ("111…"), we fall
  * back to a no-op transaction so the UI remains functional during local dev
@@ -254,7 +254,7 @@ async function executeBurnAndBridge(
     return sig;
   }
 
-  // ── Build the burnAndBridge instruction manually ────────────────────────────
+  // ── Build the burn_and_post instruction manually ─────────────────────────────
   // We avoid importing @coral-xyz/anchor in the browser bundle to keep bundle
   // size lean. The discriminator is the single source of truth from solanaIdl.ts.
   const discriminator = DISCRIMINATOR_BURN_AND_POST;

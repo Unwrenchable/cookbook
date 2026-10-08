@@ -3,9 +3,9 @@
 //! This Anchor program is the Solana half of the cross-chain burn-to-activate mechanic:
 //!
 //! 1. User holds SPL tokens on Solana.
-//! 2. Production wallets call `burn_and_post` with a target EVM chain and recipient.
-//!    `burn_and_bridge` only emits an event so local tests can run without Wormhole.
-//! 3. `burn_and_post` burns the SPL tokens and CPIs Wormhole core `post_message`.
+//! 2. Wallets call `burn_and_post` with a target EVM chain and recipient.
+//! 3. The program burns the SPL tokens and CPIs Wormhole core `post_message`.
+//!    There is no event-only burn. A call that does not post a VAA does not burn.
 //! 4. Wormhole guardians sign the VAA (Verified Action Approval).
 //! 5. The VAA is submitted to `BurnBridgeReceiver.sol` on the target EVM chain.
 //! 6. The EVM contract mints the corresponding ERC20 tokens to the recipient.
@@ -92,127 +92,18 @@ pub mod token_burn_bridge {
         Ok(())
     }
 
-    // ─── Burn and bridge ──────────────────────────────────────────────────────
+    // ─── Burn and post ────────────────────────────────────────────────────────
+    // `burn_and_bridge` was removed. It burned tokens and only emitted an event,
+    // so a user could lose tokens with nothing to claim on EVM. The old
+    // discriminator is not an instruction in this program.
 
-    /// Burns SPL tokens and emits a Wormhole cross-chain message to activate
-    /// ERC20 minting on one or more EVM chains.
+    /// Burns SPL tokens and posts the 114-byte payload to Wormhole core `post_message`.
+    /// The emitter is this program's `["emitter"]` PDA.
     ///
     /// `amount`            – raw token units to burn (includes decimals)
     /// `target_chain_id`   – Wormhole chain ID of the target EVM chain (0 = all)
     /// `evm_recipient`     – 20-byte EVM address of the token recipient
-    /// `consistency_level` – Wormhole finality (1 = confirmed, 32 = finalized)
-    pub fn burn_and_bridge(
-        ctx: Context<BurnAndBridge>,
-        amount: u64,
-        target_chain_id: u16,
-        evm_recipient: [u8; 20],
-        consistency_level: u8,
-    ) -> Result<()> {
-        // ── Validation ───────────────────────────────────────────────────────
-        require!(
-            ctx.accounts.user_token_account.amount >= amount,
-            BridgeError::InsufficientBalance
-        );
-        require!(evm_recipient != [0u8; 20], BridgeError::ZeroRecipient);
-
-        let config = &ctx.accounts.config;
-
-        // target_chain_id 0 broadcasts to every active receiver and therefore
-        // requires the all-chains tier. A single chain only requires the
-        // one-chain minimum, and inactive receivers are rejected.
-        // The documented "three chains" tier is not a separate instruction:
-        // this call carries one target, so 500 tokens still activates one chain.
-        if target_chain_id == 0 {
-            require!(amount >= MIN_BURN_ALL_CHAINS, BridgeError::BurnTooSmall);
-            require!(
-                config.evm_receivers.iter().any(|r| r.is_active),
-                BridgeError::UnsupportedChain
-            );
-        } else {
-            require!(amount >= MIN_BURN_ONE_CHAIN, BridgeError::BurnTooSmall);
-            require!(
-                config
-                    .evm_receivers
-                    .iter()
-                    .any(|r| r.chain_id == target_chain_id && r.is_active),
-                BridgeError::UnsupportedChain
-            );
-        }
-
-        // ── Increment user nonce (replay protection) ──────────────────────────
-        let user_nonce = &mut ctx.accounts.user_nonce;
-        let nonce = user_nonce.nonce;
-        user_nonce.nonce += 1;
-
-        // ── Burn SPL tokens ───────────────────────────────────────────────────
-        token::burn(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                Burn {
-                    mint:      ctx.accounts.token_mint.to_account_info(),
-                    from:      ctx.accounts.user_token_account.to_account_info(),
-                    authority: ctx.accounts.user.to_account_info(),
-                },
-            ),
-            amount,
-        )?;
-
-        // ── Build Wormhole payload ─────────────────────────────────────────────
-        // Layout (ABI-compatible with BurnBridgeReceiver.sol):
-        //   bytes32 solanaSourceMint   (32 bytes)
-        //   bytes32 solanaSender       (32 bytes)
-        //   bytes20 evmRecipient       (20 bytes, right-padded to 32)
-        //   uint64  amount             (8 bytes, big-endian)
-        //   uint16  targetChainId      (2 bytes, big-endian)
-        //   uint64  nonce              (8 bytes, big-endian)
-        let mut payload: Vec<u8> = Vec::with_capacity(134);
-
-        // Solana mint pubkey (32 bytes)
-        payload.extend_from_slice(&ctx.accounts.token_mint.key().to_bytes());
-        // Solana sender pubkey (32 bytes)
-        payload.extend_from_slice(&ctx.accounts.user.key().to_bytes());
-        // EVM recipient (20 bytes + 12 zero bytes padding)
-        payload.extend_from_slice(&evm_recipient);
-        payload.extend_from_slice(&[0u8; 12]);
-        // Amount (8 bytes big-endian)
-        payload.extend_from_slice(&amount.to_be_bytes());
-        // Target chain ID (2 bytes big-endian)
-        payload.extend_from_slice(&target_chain_id.to_be_bytes());
-        // Nonce (8 bytes big-endian)
-        payload.extend_from_slice(&nonce.to_be_bytes());
-
-        // This instruction does not call Wormhole. A burn here cannot mint on EVM.
-        // Production wallets call `burn_and_post`, which CPIs `post_message`.
-        emit!(BurnMessageEmitted {
-            sequence:          nonce,
-            solana_mint:       ctx.accounts.token_mint.key(),
-            solana_sender:     ctx.accounts.user.key(),
-            evm_recipient,
-            amount_burned:     amount,
-            target_chain_id,
-            payload_hash:      anchor_lang::solana_program::keccak::hash(&payload).0,
-            consistency_level,
-        });
-
-        // ── Update global stats ───────────────────────────────────────────────
-        let config = &mut ctx.accounts.config;
-        config.total_burned        = config.total_burned.saturating_add(amount);
-        config.total_messages_sent = config.total_messages_sent.saturating_add(1);
-
-        msg!(
-            "Burned {} tokens. Wormhole message #{} → chain {}. Recipient: {:?}",
-            amount,
-            nonce,
-            target_chain_id,
-            evm_recipient
-        );
-
-        Ok(())
-    }
-
-    /// Burns SPL tokens and posts the 114-byte payload to Wormhole core `post_message`.
-    /// The emitter is this program's `["emitter"]` PDA. Production wallets call this.
-    /// `burn_and_bridge` only emits an event so the local test suite can run without Wormhole.
+    /// `consistency_level` – below 32 posts Confirmed; 32 or above posts Finalized
     pub fn burn_and_post(
         ctx: Context<BurnAndPost>,
         amount: u64,
@@ -380,44 +271,6 @@ pub struct Initialize<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
 
-    pub system_program: Program<'info, System>,
-}
-
-#[derive(Accounts)]
-pub struct BurnAndBridge<'info> {
-    #[account(
-        mut,
-        seeds = [BRIDGE_CONFIG_SEEDS],
-        bump  = config.bump
-    )]
-    pub config: Account<'info, BridgeConfig>,
-
-    #[account(
-        mut,
-        constraint = token_mint.key() == config.token_mint @ BridgeError::WrongMint
-    )]
-    pub token_mint: Account<'info, Mint>,
-
-    #[account(
-        mut,
-        constraint = user_token_account.owner == user.key() @ BridgeError::WrongOwner,
-        constraint = user_token_account.mint  == token_mint.key() @ BridgeError::WrongMint
-    )]
-    pub user_token_account: Account<'info, TokenAccount>,
-
-    #[account(
-        init_if_needed,
-        payer  = user,
-        space  = UserNonce::LEN,
-        seeds  = [USER_NONCE_SEEDS, user.key().as_ref()],
-        bump
-    )]
-    pub user_nonce: Account<'info, UserNonce>,
-
-    #[account(mut)]
-    pub user: Signer<'info>,
-
-    pub token_program:  Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 
