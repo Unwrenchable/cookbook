@@ -72,11 +72,10 @@ The frontend keeps secrets server-side with Next API routes:
 - `frontend/src/app/api/solana-rpc/route.ts` proxies Solana RPC using server-only `SOLANA_RPC_URL`
 - `frontend/src/app/api/ai-describe/route.ts` uses `OPENAI_API_KEY` or falls back to built-in copy
 - `frontend/src/app/api/ipfs-upload/route.ts` uses `PINATA_JWT` or falls back to mock hashes
-- `frontend/src/app/api/cross-chain/relay/route.ts` is the current devnet/testnet bridge path: it uses a server-side relayer key to call `receiveRelayedMessage()` on configured EVM receivers after the Solana burn confirms
 
 On the EVM side, `contracts/evm/contracts/factories/TokenFactory.sol` is the core contract. It clones one of 9 template implementations based on `TokenFlavor`, enforces launch-fee and parameter validation, tracks `tokensByOwner` / `allTokens`, and supports on-chain referrals with `createTokenWithReferral` plus `claimReferralEarnings`.
 
-The Solana bridge flow spans multiple packages. `contracts/solana/programs/token-burn-bridge` burns SPL tokens and emits bridge data; `frontend/src/hooks/useSolanaLaunch.ts` builds the burn instruction, reconstructs the supported dev/test payload from the Solana burn inputs plus nonce, and asks `/api/cross-chain/relay` to submit that payload to `contracts/evm/contracts/bridge/BurnBridgeReceiver.sol` on target EVM chains. The bridge docs in `docs/CROSS_CHAIN_BURN_BRIDGE.md` are important context: the full Wormhole VAA verification path is still scaffolded, and development currently relies on the trusted-relayer path.
+The Solana bridge flow spans multiple packages and has no server-side minting key. `contracts/solana/programs/token-burn-bridge` burns SPL tokens and posts a Wormhole message (`burn_and_post`, emitted from the program's `["emitter"]` PDA). `frontend/src/hooks/useSolanaLaunch.ts` sends the burn, polls Wormholescan for the signed VAA, and then the user's own wallet calls `BurnBridgeReceiver.receiveMessage(vaa)` (`contracts/evm/contracts/bridge/BurnBridgeReceiver.sol`) through `walletClient.writeContract` on each target EVM chain. The receiver verifies the VAA with Wormhole core `parseAndVerifyVM`, checks the emitter allowlist, and rejects replays by VAA hash and by `(chain, emitter, sequence)`. See `docs/CROSS_CHAIN_BURN_BRIDGE.md`.
 
 # Key conventions
 
@@ -85,8 +84,8 @@ The Solana bridge flow spans multiple packages. `contracts/solana/programs/token
 - Empty env-backed contract addresses are a supported state, not an error. `factoryAddress` and `receiverAddress` intentionally default to `""`, and the UI surfaces "soon" badges or warnings instead of crashing when a chain is not deployed yet.
 - Do not move RPC/API secrets into client code. The repo pattern is to keep provider keys server-only and route browser calls through Next API handlers.
 - Preserve the receipt-waiting pattern in `useDeployToken`: it intentionally uses viem's public client directly instead of wagmi's receipt hook inside async callbacks.
-- Preserve the current devnet/testnet bridge limitation in `useSolanaLaunch`: below a 1,000-token broadcast burn, the supported payload only targets one explicit EVM chain. The UI should not pretend arbitrary multi-chain subsets are supported by the current Solana program.
+- Preserve the target-chain rule in `useSolanaLaunch`: one selected chain is encoded as that chain's id; more than one encodes target chain 0, which receivers reject unless the timelocked wildcard op has executed. The UI should not pretend arbitrary multi-chain subsets are supported by the current Solana program.
 - Preserve the current missing-program behavior in `useSolanaLaunch`: when `NEXT_PUBLIC_SOLANA_BURN_BRIDGE_PROGRAM_ID` is still the placeholder `11111111111111111111111111111111`, the hook now fails explicitly instead of sending a fake no-op transaction.
-- The current bridge development path is `receiveRelayedMessage()` with a trusted relayer. `BurnBridgeReceiver.receiveMessage()` deliberately reverts until the Wormhole VAA verification path is completed.
-- Devnet/testnet bridge work now depends on server env as well as public receiver addresses: `CROSS_CHAIN_RELAYER_PRIVATE_KEY` must be set for `/api/cross-chain/relay`, and each target `BurnBridgeReceiver` must trust that relayer address.
+- `BurnBridgeReceiver.receiveMessage(vaa)`, submitted by the user's wallet, is the only mint path. There is no trusted relayer, no `receiveRelayedMessage()`, and no server-side minting key. Do not add an API route that holds a key and mints.
+- Receiver admin changes (trusted emitter, Wormhole core, mint ratio, mintable token, wildcard target) go through the `DelayedAdmin` timelock: `queue*`, wait for the delay, then `execute*`. `SOLANA_EMITTER` is the burn-bridge `["emitter"]` PDA (`pnpm emitter <programId>`), not the program id.
 - CI does not cover the full monorepo. If you change contracts or Solana code, do not assume GitHub Actions will catch regressions there.
