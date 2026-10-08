@@ -11,11 +11,11 @@
  */
 "use client";
 
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useState, type Dispatch, type SetStateAction } from "react";
 
 interface NetworkCtx {
   isTestnet: boolean;
-  setIsTestnet: (v: boolean) => void;
+  setIsTestnet: Dispatch<SetStateAction<boolean>>;
 }
 
 /**

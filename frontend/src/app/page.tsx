@@ -24,12 +24,13 @@ const VanityAddressGenerator = dynamic(() => import("@/components/VanityAddressG
 const LPLockerPanel = dynamic(() => import("@/components/LPLockerPanel").then((m) => m.LPLockerPanel), { ssr: false });
 const SwapWidget = dynamic(() => import("@/components/SwapWidget").then((m) => m.SwapWidget), { ssr: false });
 const ReferralPanel = dynamic(() => import("@/components/ReferralPanel").then((m) => m.ReferralPanel), { ssr: false });
+const GogglesPanel = dynamic(() => import("@/components/GogglesPanel").then((m) => m.GogglesPanel), { ssr: false });
 const VerifyPanel = dynamic(() => import("@/components/VerifyPanel").then((m) => m.VerifyPanel), { ssr: false });
 
-type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "verify" | "vanity" | "dashboard" | "referral";
+type Tab = "evm" | "solana-bridge" | "lock" | "swap" | "verify" | "vanity" | "dashboard" | "goggles" | "referral";
 type DiscoveryTab = "trending" | "new" | "graduate" | "cross-chain" | "top-earners";
 
-const VALID_TABS: Tab[] = ["evm", "solana-bridge", "lock", "swap", "verify", "vanity", "dashboard", "referral"];
+const VALID_TABS: Tab[] = ["evm", "solana-bridge", "lock", "swap", "verify", "vanity", "dashboard", "goggles", "referral"];
 
 const SIDEBAR_TABS: { id: Tab; emoji: string; label: string; sublabel?: string }[] = [
   { id: "evm",           emoji: "🚀", label: "Launch",    sublabel: "EVM Token" },
@@ -39,6 +40,7 @@ const SIDEBAR_TABS: { id: Tab; emoji: string; label: string; sublabel?: string }
   { id: "dashboard",     emoji: "📋", label: "Portfolio", sublabel: "My Tokens" },
   { id: "lock",          emoji: "��", label: "Lock LP",   sublabel: "Anti-Rug" },
   { id: "vanity",        emoji: "🔮", label: "Vanity",    sublabel: "0x Prefix" },
+  { id: "goggles",       emoji: "🕶️", label: "Goggles",   sublabel: "Name Tokens" },
   { id: "referral",      emoji: "🤝", label: "Referral",  sublabel: "Earn Fees" },
 ];
 
@@ -569,6 +571,26 @@ function HomePageContent() {
                   <SectionLabel>Vanity Generator</SectionLabel>
                   <GlassCard className="mt-1">
                     <VanityAddressGenerator />
+                  </GlassCard>
+                </div>
+              </div>
+            )}
+
+            {/* -- Supreme Goggles ------------------------------------------------------ */}
+            {activeTab === "goggles" && (
+              <div className="grid gap-4 lg:grid-cols-[1fr_2fr] animate-fade-in-up">
+                <div>
+                  <SectionLabel>Name Your Token</SectionLabel>
+                  <GlassCard className="mt-1 text-sm text-gray-400 space-y-3">
+                    <p>After a launch, claim a lifetime on-chain name for the token.</p>
+                    <p className="text-brand-400">.fizz, .goon, .supreme, or any extension you invent.</p>
+                    <p>One-time payment, no renewals. Records store the logo, socials, and token wallet.</p>
+                  </GlassCard>
+                </div>
+                <div>
+                  <SectionLabel>Supreme Goggles</SectionLabel>
+                  <GlassCard className="mt-1">
+                    <GogglesPanel isTestnet={isTestnet} />
                   </GlassCard>
                 </div>
               </div>
