@@ -3,7 +3,7 @@
  * Uses OpenAI gpt-4o-mini when OPENAI_API_KEY is set, otherwise returns a template.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { allowRequest, clientKey } from "@/lib/apiLimits";
+import { allowRequestShared, clientKey } from "@/lib/apiLimits";
 
 const FALLBACK_DESCRIPTIONS: Record<string, string> = {
   "Standard ERC20": "A clean, no-frills ERC20 token built for speed and simplicity. Pure utility, zero bloat. The OGs know what this is.",
@@ -24,7 +24,7 @@ const MAX_FLAVOR_LEN = 64;
 const MAX_VIBES_LEN  = 120;
 
 export async function POST(req: NextRequest) {
-  if (!allowRequest(`ai:${clientKey((name) => req.headers.get(name))}`, 20, 60_000)) {
+  if (!await allowRequestShared(`ai:${clientKey((name) => req.headers.get(name))}`, 20, 60_000)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

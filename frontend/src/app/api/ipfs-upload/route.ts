@@ -3,7 +3,7 @@
  * Falls back to mock hashes when PINATA_JWT is not set.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { allowRequest, clientKey } from "@/lib/apiLimits";
+import { allowRequestShared, clientKey } from "@/lib/apiLimits";
 
 const PINATA_BASE = "https://api.pinata.cloud";
 
@@ -15,7 +15,7 @@ const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "ima
 const ALLOWED_EXTENSIONS = /\.(png|jpe?g|gif|webp)$/i;
 
 export async function POST(req: NextRequest) {
-  if (!allowRequest(`ipfs:${clientKey((name) => req.headers.get(name))}`, 20, 60_000)) {
+  if (!await allowRequestShared(`ipfs:${clientKey((name) => req.headers.get(name))}`, 20, 60_000)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

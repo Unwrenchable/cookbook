@@ -7,7 +7,7 @@
  * Usage (client-side): POST /api/rpc/<chainId>  with a JSON-RPC body.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { allowRequest, clientKey, MAX_RPC_BODY_BYTES, rpcBatchError } from "@/lib/apiLimits";
+import { allowRequestShared, clientKey, MAX_RPC_BODY_BYTES, rpcBatchError } from "@/lib/apiLimits";
 
 /** Mapping from EVM chain ID → Alchemy network slug */
 const ALCHEMY_NETWORKS: Record<string, string> = {
@@ -101,7 +101,7 @@ export async function POST(
     );
   }
 
-  if (!allowRequest(`evm:${chainId}:${clientKey((name) => request.headers.get(name))}`, 120, 60_000)) {
+  if (!await allowRequestShared(`evm:${chainId}:${clientKey((name) => request.headers.get(name))}`, 120, 60_000)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

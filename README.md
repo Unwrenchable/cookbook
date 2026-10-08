@@ -237,7 +237,7 @@ PINATA_JWT=...                      # IPFS metadata upload
 - No upgradeable proxies are used in the factory itself; template implementations are upgradeable only via the admin `setImplementation()` call, which only affects **future** tokens (existing clones are unaffected).
 - Factory enforces: total fees ≤ 30%, owner ≠ zero address, supply > 0.
 - `LPLocker` uses `ReentrancyGuard` and `SafeERC20` on all state-changing paths.
-- `BurnBridgeReceiver.receiveMessage()` **currently reverts** — it is a scaffold awaiting full Wormhole VAA integration. Use `receiveRelayedMessage()` with a trusted relayer for development testing. See [`docs/CROSS_CHAIN_BURN_BRIDGE.md`](docs/CROSS_CHAIN_BURN_BRIDGE.md).
+- `BurnBridgeReceiver.receiveMessage()` verifies a Wormhole VAA. There is no trusted-relayer mint path. See [`docs/CROSS_CHAIN_BURN_BRIDGE.md`](docs/CROSS_CHAIN_BURN_BRIDGE.md).
 - Before mainnet deployment: set `feeRecipient` in `scripts/deploy.ts` to your treasury / multisig wallet (not the deployer key).
 
 ---

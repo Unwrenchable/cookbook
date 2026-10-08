@@ -10,7 +10,7 @@ GoonForge (`cookbook`) is a multi-chain meme-token launchpad. A Next.js app lets
 - `BondingCurveToken`, `PumpMigrateToken`
 - `AIAgentToken`, `PolitiFiToken`, `UtilityHybridToken`
 
-The same deploy ships an `LPLocker`. A Solana Anchor program, `token-burn-bridge`, is supposed to burn an SPL token and wake an ERC-20 on EVM through Wormhole. That path was a scaffold: the program emits an event, and `BurnBridgeReceiver.receiveMessage()` still reverts. The missing piece for even the trusted-relayer path was a mintable ERC-20. `BridgeMintableToken` is that token. `scripts/deployBridgeMintableToken.ts` deploys it; the owner must then call `setMinter` with the receiver. This change set does not run either script.
+The same deploy ships an `LPLocker`. A Solana Anchor program, `token-burn-bridge`, burns an SPL token. Production wallets call `burn_and_post`, which CPIs Wormhole core `post_message`. `BurnBridgeReceiver.receiveMessage` asks that core to verify the guardian signatures, then checks the emitter allowlist, the VAA hash, the sequence, and a 114-byte payload before minting. `BridgeMintableToken` is the mintable ERC-20. `scripts/deployBridgeMintableToken.ts` deploys it; the owner must then call `setMinter` with the receiver. This change set does not run either script.
 
 Stack: Solidity 0.8.28, Hardhat, OpenZeppelin 5, Anchor 0.30, Next.js 15, pnpm, Turborepo. CI (`.github/workflows/ci.yml`) already installs, lints, runs `pnpm test`, compiles, and runs the Hardhat preflight. That workflow now covers the new tests because they live in `contracts/evm/test`.
 
@@ -18,10 +18,10 @@ Stack: Solidity 0.8.28, Hardhat, OpenZeppelin 5, Anchor 0.30, Next.js 15, pnpm, 
 
 | | Before | After |
 |---|---|---|
-| Hardhat tests | 40, all in `TokenFactory.test.ts` | **59 passing** |
-| API limit tests | none | **5 passing** (`frontend/src/lib/apiLimits.test.ts`, `node --test`) |
-| What they hit | Factory deploy, one happy path per flavor, flat and percentage launch fees, referrals, basic LP lock | Those, plus reflection payouts, staking solvency, curve round-trips and a 12-step reserve fuzz, pump graduation, PolitiFi resolution, the AI burn cap, fee-on-transfer locks, and the burn bridge |
-| Bridge / mintable token | No tests. No mintable contract in the repo | `BridgeMintableToken` plus relay, replay, padding, wrong-chain, and wildcard tests |
+| Hardhat tests | 40, all in `TokenFactory.test.ts` | **63 passing** |
+| API limit tests | none | **7 passing** (`frontend/src/lib/apiLimits.test.ts`, `node --test`) |
+| What they hit | Factory deploy, one happy path per flavor, flat and percentage launch fees, referrals, basic LP lock | Those, plus reflection payouts, staking solvency, curve round-trips and a 12-step reserve fuzz, pump graduation into a mock router, PolitiFi resolution, the AI burn cap, fee-on-transfer locks, VAA checks, the admin delay, and fee caps |
+| Bridge / mintable token | No tests. No mintable contract in the repo | `BridgeMintableToken` plus a mock Wormhole core: valid VAA, bad signature, wrong emitter, hash replay, sequence replay, padded payload, wrong chain, wildcard |
 | Solana | `contracts/solana/tests/token-burn-bridge.ts` existed but was not in CI | Same suite, plus inactive-chain, all-chains minimum, and zero-recipient cases. Not executed here (see below) |
 | Static analysis | Solhint in CI | Solhint clean. Slither 0.11.6 against Hardhat: no high findings after the fixes |
 
@@ -36,8 +36,8 @@ Severity is impact on users of these contracts if they were deployed as previous
 | ID | Severity | Where | Issue | Status |
 |---|---|---|---|---|
 | F1 | High | `BurnBridgeReceiver` | Replay key is `keccak256(payload)`, but any length `>= 114` was accepted. Extra trailing bytes change the hash and not the parsed fields, so one burn could mint forever. | **Fixed.** Length must be exactly 114. Test rejects a one-byte suffix. |
-| F2 | High | `BurnBridgeReceiver` | `targetChainId == 0` was accepted on every chain. One Solana burn would mint on every receiver. | **Fixed.** Wildcard minting is off until the owner calls `setAcceptWildcardTarget(true)`. |
-| F3 | High | `BurnBridgeReceiver` | Production mint path is a trusted relayer, not a Wormhole VAA. `receiveMessage` still reverts. A trusted relayer can submit any payload. | **Not fixed.** Doing this properly is the Wormhole integration, not a small patch. Do not point this at a valuable token. |
+| F2 | High | `BurnBridgeReceiver` | `targetChainId == 0` was accepted on every chain. One Solana burn would mint on every receiver. | **Fixed.** Wildcard minting stays off until the owner queues `setAcceptWildcardTarget(true)` and anyone executes it after the admin delay. |
+| F3 | High | `BurnBridgeReceiver` | Production mint path was a trusted relayer, not a Wormhole VAA. `receiveMessage` reverted. A trusted relayer could submit any payload. | **Fixed.** `receiveMessage` calls `parseAndVerifyVM` on the configured Wormhole core. The emitter chain and address must be allowlisted. Replay uses the VAA hash and `(chain, emitter, sequence)`. Payload length is exactly 114 and the amount must be non-zero. `receiveRelayedMessage` is gone. Solana `burn_and_post` CPIs core `post_message`. Tests cover the cases above with `MockWormholeCore`. |
 | F4 | High | Missing contract | Docs and `deployBurnBridgeReceiver.ts` require an ERC-20 with `mint`, granted to the receiver. No such contract existed (`MINTER_ROLE` was mentioned and never defined). | **Fixed.** `BridgeMintableToken` has a single minter. |
 | F5 | High | `ReflectionERC20` | Every transfer synced reflection debt to the new balance and dropped unclaimed rewards. The reflection tax was burned and nobody could claim it. | **Fixed.** Checkpoints store claimable rewards before the balance change, then distribute on post-transfer balances. Test: claimed amount matches the burn within a few wei. |
 | F6 | High | `UtilityHybridToken` | `fundRewardPool` / `stake` / `unstake` / `claimRewards` went through the burn tax. The pool was credited for tokens the contract never received, so reward claims could spend other users' staked principal. Unstake also burned principal. | **Fixed.** Transfers to or from the token contract are not burned. Test checks balance equals `totalStaked + rewardPool`. |
@@ -45,7 +45,7 @@ Severity is impact on users of these contracts if they were deployed as previous
 | F8 | Medium | `UtilityHybridToken` | Votes counted wallet balance plus stake in the same transaction. A flash loan could pass any proposal. Reward math could also overflow and brick `unstake`. | **Fixed.** Weight is stake that existed before the proposal. Rewards use `Math.mulDiv`. Proposals last 1–30 days. |
 | F9 | High | `BondingCurveToken` | `setCurveParams` worked after buys. The owner could reprice the curve and sell into ETH deposited by other users. `getBuyCost` also overflowed inside the buy search. Plain ETH transfers sat outside `ethReserve` and were stuck. | **Fixed.** Parameters lock once supply or reserve is non-zero. Quotes that overflow are treated as too expensive. Bare ETH reverts. Fuzz test: contract balance equals `ethReserve` across random buys and sells. |
 | F10 | High | `PumpMigrateToken` | `virtualEthReserve` (0.03 ETH in wei) was added to token supply. The first raw token cost on the order of tens of ETH, so the curve did not work. The fee was taken on the whole `msg.value`, including ETH that was refunded. | **Fixed.** Offset is `virtualTokenReserve = 1_000_000` token units. Fee is charged on the ETH the curve keeps. |
-| F11 | High | `PumpMigrateToken` | Graduation pauses trading for 24h and only the owner could resume. There is still no `addLiquidityToDex`. If the owner never resumed, every buyer's ETH stayed in the contract. The owner could also move `graduationThreshold` after trading started. | **Partly fixed.** Anyone can unpause after 24h. Only the owner may set the pair. Threshold changes require `ethReserve == 0`. **Not built:** moving the reserve into a DEX and burning the LP. That is the real pump.fun / four.meme behavior and needs a router, slippage limits, and a locker integration. |
+| F11 | High | `PumpMigrateToken` | Graduation paused trading for 24h and only the owner could resume. There was no DEX migration. If the owner never resumed, every buyer's ETH stayed in the contract. The owner could also move `graduationThreshold` after trading started. | **Fixed for the curve.** The buy that crosses `graduationThreshold` calls `addLiquidityETH` on the configured Uniswap V2-style router in the same transaction. LP is minted to `0x000000000000000000000000000000000000dEaD`. Curve trading stays halted. A second migration cannot run. ETH and token minimums are enforced (default 99% of the reserve, 99% of the paired token amount). A short router reverts the whole buy. This is not a CEX listing. |
 | F12 | Medium | `PolitiFiToken` | `lockCutoff` added the same holder every time it was listed, so the owner could inflate a side and distort or zero-out prizes. Prize claims were taxed again. `resolve` ignored `resolutionTime` because of `\|\| msg.sender == owner()`. Loser burn was documented and never implemented, and holders could transfer out of a position after the snapshot. | **Fixed.** Snapshots are deduped. User transfers freeze from cutoff until resolution. Prize payouts are not taxed. `resolve` requires the timestamp. `applyLoserBurn` burns `loserBurnBps` of the loser's balance, and that address cannot transfer until it runs. |
 | F13 | Medium | `token-burn-bridge` | `is_active` was stored and never checked. `target_chain_id = 0` only required the 100-token minimum, not the 1,000-token all-chains tier. The zero EVM address was accepted. The "3 chains" tier is not an instruction: the call takes one chain id. | **Fixed** for inactive receivers, the all-chains minimum, and the zero recipient. The 500-token tier still activates one chain. Tests were added; they were not run in this environment. |
 | F14 | High | Repo secrets | `contracts/solana/target/deploy/token_burn_bridge-keypair.json` and the local validator keypairs under `.anchor/test-ledger/` were committed, along with ledger rocksdb files. Anyone with the program keypair can deploy or upgrade that program id. | **Removed from the index** and gitignored (`.anchor/`, `test-ledger/`, `target/`). They remain in git history. **Rotate the program id before any deploy.** This PR does not generate a replacement key. Full scan notes are below. |
@@ -56,7 +56,7 @@ Severity is impact on users of these contracts if they were deployed as previous
 | F19 | Medium | Upload, describe, and RPC proxies | SVG logos were accepted. `getProgramAccounts` and `requestAirdrop` were forwardable. Errors echoed Pinata, OpenAI, and rejected method names. No rate limit or batch cap. | **Fixed.** SVG rejected. Those methods removed. Bodies capped at 32KB, batches at 8. 120 RPC calls/min and 20 uploads or descriptions/min per instance. Failures return a fixed string. RPC URLs are a fixed map, not a caller-supplied host. |
 | F20 | Low | Branch protection | `protect-main.yml` required a status check named `type-check`. The CI job is `quality`. | **Fixed** in the workflow file. It only takes effect the next time that workflow runs on `main`. |
 | F21 | Low | `LPLocker` tests | Unlock times used `Date.now()`, so they failed once another test moved Hardhat's clock. | **Fixed.** Tests use the latest block timestamp. |
-| F22 | Info | Slither | `stakes[msg.sender].amount == 0` is how the first stake remembers the cap-exclusion flag. `lpTokensLocked` is never written. | **Left.** The equality is intentional. `lpTokensLocked` is the unimplemented graduation lock (see F11). |
+| F22 | Info | Slither | `stakes[msg.sender].amount == 0` is how the first stake remembers the cap-exclusion flag. | **Left.** The equality is intentional. `lpTokensLocked` is now the liquidity amount returned by the router at graduation. |
 | F23 | Info | Dependencies | `pnpm audit` on main reported 4 criticals: Next.js below 15.5.24, `protobufjs` below 7.5.5, and `shell-quote` below 1.11.0. A later pass still had 66 high. | **Mostly fixed.** See "Dependency audit" below. After the second override pass: 0 critical, 11 high, 14 moderate, 6 low. |
 | F24 | Medium | `TokenFactory` | Nothing could stop new launches if a template turned out to be unsafe. | **Fixed.** `setLaunchesPaused` is owner-only and blocks `createToken` and `createTokenWithReferral`. Existing clones are not paused or upgraded. |
 | F25 | High | `useSolanaLaunch` | If the Wormhole poll timed out, the client built a simulated payload and submitted `receiveRelayedMessage`, including on a mainnet target. | **Fixed.** Timeout throws and sends nothing. The wallet chain id must match the target before `writeContract`. |
@@ -160,19 +160,19 @@ Compared with pump.fun, four.meme, PinkSale, and Clanker (Base / Uniswap v4), ch
 
 - Permanent tax lock, which those platforms get by not having a mutable tax at all.
 - LP lock extend and transfer, which PinkLock-style lockers already have.
-- A pump curve that is cheap enough to buy, and a graduation pause that cannot freeze ETH forever.
+- A pump curve that is cheap enough to buy. The graduating buy moves the reserve into the configured DEX and burns the LP.
+- Wormhole verification on the receive path, and a Solana `burn_and_post` CPI into core `post_message`.
 - The mintable token the bridge deploy script already assumed.
 
 **Do these next, in order:**
 
-1. **Finish graduation for real.** pump.fun and four.meme move the curve reserve into a DEX pool and burn the LP. `PumpMigrateToken` pauses, emits `Graduated`, and stops. Until `addLiquidityToDex` exists, "pump → CEX" is a bonding curve with a pause. This is the feature gap that matters most, and it is too large and too easy to get wrong to sneak into this patch.
-2. **Stop calling the bridge trustless until VAA verification exists.** Wire Wormhole `post_message` on Solana and `parseAndVerifyVM` on the receiver, with the emitter check that `receiveRelayedMessage` does not do. Until then, keep `BridgeMintableToken` on a test mint.
-3. **Rotate the Solana program id** before devnet or mainnet. The program keypair is in commit `cccb3644dfcfeed5907d3c45c09c512dfc01808f` and stays in history after this PR. Generate the new key locally and do not commit it. Also rotate any API token or deployer key that lived in an untracked `frontend/.env.local.txt` or similar file.
-4. **Launch on Solana directly.** The roadmap item is the actual market. pump.fun's advantage is distribution and a one-click SPL curve, not nine ERC-20 flavors.
-5. **Default launches to immutable settings.** Competitors that allow tax (four.meme) still make the split explicit at creation. GoonForge should call `lockTax()` from the deploy UI and show whether it was locked. Owner-set DEX pairs are the honeypot.
-6. **Creator fees and a market, not another flavor.** pump.fun publishes a curve fee (about 1.25% including a 0.30% creator fee) and a live order flow. A factory with a 0.5% launch fee and a swap deep-link does not give traders a reason to stay.
-7. **Anti-sniper on the first blocks.** Clanker auctions or decays the first swaps (up to about two minutes). A public `createToken` plus an immediate buy is sandwichable. Slippage arguments on the curve help the buyer, not the block after creation.
-8. **Discovery, vesting, and a locker explorer.** PinkSale's lock duration, vesting, and a page that shows who is locked are what buyers check. `LPLocker` has no index beyond on-chain events.
+1. **Rotate the Solana program id** before devnet or mainnet. The program keypair is in commit `cccb3644dfcfeed5907d3c45c09c512dfc01808f` and stays in history after this PR. Generate the new key locally and do not commit it. Also rotate any API token or deployer key that lived in an untracked `frontend/.env.local.txt` or similar file.
+2. **Point the pump router at the canonical factory for that chain before the first buy.** The contract does not hardcode Uniswap or PancakeSwap. A router set before the lock can still take the reserve. Once it is set and `ethReserve != 0`, it cannot be replaced.
+3. **Launch on Solana directly.** The roadmap item is the actual market. pump.fun's advantage is distribution and a one-click SPL curve, not nine ERC-20 flavors.
+4. **Default launches to immutable settings.** Competitors that allow tax (four.meme) still make the split explicit at creation. GoonForge should call `lockTax()` from the deploy UI and show whether it was locked. Owner-set DEX pairs are the honeypot.
+5. **Creator fees and a market, not another flavor.** pump.fun publishes a curve fee (about 1.25% including a 0.30% creator fee) and a live order flow. A factory with a 0.5% launch fee and a swap deep-link does not give traders a reason to stay.
+6. **Anti-sniper on the first blocks.** Clanker auctions or decays the first swaps (up to about two minutes). A public `createToken` plus an immediate buy is sandwichable. Slippage arguments on the curve help the buyer, not the block after creation.
+7. **Discovery, vesting, and a locker explorer.** PinkSale's lock duration, vesting, and a page that shows who is locked are what buyers check. `LPLocker` has no index beyond on-chain events.
 
 ## User-safety hardening
 
@@ -182,21 +182,22 @@ API routes (`solana-rpc`, `rpc/[chain]`, `ipfs-upload`, `ai-describe`):
 - Unknown chain ids never become a URL. Solana `network` is only `devnet` or `mainnet-beta`.
 - Bodies over 32KB are rejected. RPC batches over 8 calls are rejected. The error does not repeat the rejected method.
 - Pinata and OpenAI failures return "Image upload failed", "Metadata upload failed", "Description service unavailable", or "Upload failed" / "Description failed", not the upstream body.
-- In-memory rate limits: 120/min for each RPC proxy, 20/min for upload and describe. Keyed by the first `x-forwarded-for` hop or `x-real-ip`. This map is per server instance. It is not a global limit on a multi-instance host.
+- Rate limits: 120/min for each RPC proxy, 20/min for upload and describe. Keyed by the first `x-forwarded-for` hop or `x-real-ip`. When `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set (or the `KV_REST_API_*` pair), the routes use a Redis sorted-set sliding window shared across instances. A configured store that errors denies the request. When both pairs are empty, the in-memory limiter is used and is not shared across instances.
 - There is no `frontend/src/app/api/cross-chain/` route in this repo. That folder was left untouched.
 
 Frontend transactions:
 
 - Swap shows the connected wallet as recipient, a 1% slippage line, and refuses to send until a quote exists.
-- Bridge submit checks the wallet chain id against `target.evmChainId` and does not fall back to a simulated VAA.
+- Bridge submit checks the wallet chain id against `target.evmChainId` and sends the guardian-signed VAA bytes to `receiveMessage`. A timeout does not build a payload. The Solana transaction calls `burn_and_post` and, when the Wormhole bridge account reports a fee, transfers that fee to the fee collector in the same transaction.
 - Token names and metadata URIs render as React text or as links built by our upload route (`https://gateway.pinata.cloud/ipfs/...`). `dangerouslySetInnerHTML` is only the static JSON-LD in `layout.tsx`. SVG uploads stay rejected.
 
 Contracts (existing behavior kept where a change would surprise holders):
 
-- Factory launches can be paused. That does not seize or pause tokens already deployed. EIP-1167 clones embed the implementation address, so `setImplementation` affects future clones only. No timelock was added on that setter.
-- `createToken`, `createTokenWithReferral`, `claimReferralEarnings`, LP lock/unlock, curve buy/sell, and `receiveRelayedMessage` are non-reentrant. Token reward claims use internal `_transfer` / `_mint`.
-- `launchFeeBps` is at most 1000 (10%) and `referralShareBps` at most 5000, both with events. The flat `launchFee` in wei is still unbounded. Tax stays mutable until the owner calls `lockTax()`.
-- No admin function transfers a user's token balance to the owner. Curve and pump reserves are not withdrawable except through sells (and, after 24h, anyone can resume pump trading).
+- Factory launches can be paused immediately. That does not seize or pause tokens already deployed. EIP-1167 clones embed the implementation address, so a queued `setImplementation` affects future clones only.
+- `setImplementation`, `setLaunchFee`, `setFeeRecipient`, `setLaunchFeeBps`, and `setReferralShareBps` are queued. The same queue covers the receiver's token, mint ratio, Wormhole core, emitter allowlist, and wildcard flag. Execute is permissionless after `eta`. Cancel is owner-only. The delay starts at 24 hours, cannot be below 1 hour or above 30 days, and can change only by queueing `setAdminDelay`.
+- `createToken`, `createTokenWithReferral`, `claimReferralEarnings`, LP lock/unlock, curve buy/sell, and `receiveMessage` are non-reentrant. Token reward claims use internal `_transfer` / `_mint`.
+- Flat `launchFee` is at most 1 ether. `launchFeeBps` is at most 1000 (10%) and `referralShareBps` at most 5000. Combined create-time token fees are at most 3000 bps. Token setters keep their own caps (tax 25%, deflationary burn 10%, reflection 10%, utility reward and burn 5%, agent burn cap 5%/day, pump trading fee 3% at init) and emit an event on change. Tax stays mutable until the owner calls `lockTax()`.
+- No admin function transfers a user's token balance to the owner. Curve reserves are not withdrawable except through sells. A graduated pump curve does not reopen. Its reserve leaves only through the router.
 
 ## Behavior that changed on purpose
 
@@ -206,12 +207,43 @@ These are deployed only when someone ships the new bytecode. Existing clone addr
 - Staking, unstaking, reward funding, and reward claims move the full amount. Ordinary wallet transfers still burn.
 - Governance weight is prior stake, not tokens held in the wallet.
 - Bonding-curve parameters freeze after the first trade. Bare ETH to a curve reverts.
-- The pump curve's virtual reserve is 1,000,000 token units, not 0.03 ETH of wei added to supply. The trading fee applies to consumed ETH. Anyone can resume trading after 24 hours.
+- The pump curve's virtual reserve is 1,000,000 token units, not 0.03 ETH of wei added to supply. The trading fee applies to consumed ETH. The graduating buy seeds the DEX and burns the LP. Trading on the curve does not resume.
 - PolitiFi transfers freeze between cutoff and resolution. Losers must be burned before they can transfer. `resolve` waits for `resolutionTime`.
-- Bridge messages of the wrong length, the wrong chain, or chain id 0 (unless opted in) do not mint.
+- Bridge messages with a bad guardian result, the wrong emitter, a reused hash or sequence, the wrong length, the wrong chain, or chain id 0 (unless the wildcard op has executed) do not mint. There is no relayer mint function.
 - The factory rejects oversized names, symbols, and decimals.
 - SVG uploads are rejected.
 - The factory owner can pause new launches. Tokens already deployed keep working.
 - A swap without a quote, or a bridge proof that has not arrived, does not send a transaction.
 
 Happy-path factory tests from before this change still pass.
+
+## Deployment notes
+
+Nothing in this PR was deployed. Existing clone addresses keep their old implementation bytecode until new implementations are deployed and the factory points future clones at them.
+
+Suggested order for a fresh chain:
+
+1. Deploy the nine token implementations, then `TokenFactory` with a launch fee of at most 1 ether. The constructor sets a 24-hour admin delay.
+2. Deploy `LPLocker`.
+3. Deploy `BridgeMintableToken`, then `BurnBridgeReceiver(thisChainId, wormholeCore, emitter, mintableToken, mintRatio)`. The constructor allowlists the emitter on Wormhole chain id 1 (Solana) when it is non-zero. Then `setMinter` on the token to the receiver.
+4. For each pump token, the owner calls `setDexRouter` with that chain's Uniswap V2-style router before the first buy. The graduating buy is atomic. LP goes to `0x000000000000000000000000000000000000dEaD`. The curve does not reopen.
+
+Admin delay: default 24 hours, floor 1 hour, cap 30 days. Changing the delay is itself a queued op, so it cannot skip the current delay. `setLaunchesPaused` stays immediate.
+
+API env (empty means the in-memory limiter): `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`, or `KV_REST_API_URL` and `KV_REST_API_TOKEN`. Documented with empty values in `frontend/.env.example`.
+
+Solana production path is `burn_and_post`. The emitter PDA seeds are `["emitter"]`. The Wormhole message account is a fresh keypair the client partial-signs. The client reads the bridge fee at byte offset 16 and transfers it to the fee collector in the same transaction when the fee is non-zero. `burn_and_bridge` does not post a VAA.
+
+Rotate the program id before any deploy. Do not commit a replacement key. The id `2sAka7jCkP71LbKk1MpELxFpjSHjScQk1aStrDt4Pnnf` is in git history.
+
+## Remaining risks
+
+- `burn_and_bridge` still burns tokens and only emits an event. A direct call does not produce a VAA, so the EVM side will not mint, and the burned tokens are gone.
+- A pump router set before the first buy, or before the lock, is trusted. A malicious router can take the reserve. The UI must set the canonical router. It locks once it is set and `ethReserve != 0`.
+- Shared rate limiting is in-memory when the Redis/KV env pair is unset, so it does not span Vercel instances. A configured store that returns an error fails closed.
+- Tax, burn, and reflection setters stay immediate until the owner calls `lockTax()` where that function exists. They are capped. Pump `setFeeWallet` is still immediate.
+- There is no per-token pause. Factory pause covers new launches only.
+- Wormhole guardian verification is delegated to the core contract. This repo's mock core is tests only. A wrong core address, queued and executed, would accept whatever that contract returns.
+- The Solana program id in history must be rotated before deploy. Anchor tests and `cargo check` were not run: Cargo 1.83.0 cannot parse `block-buffer` 0.12.0 (edition 2024, Rust 1.85+), and `anchor` is not installed.
+- Dependency highs that remain: `bigint-buffer` 1.1.5, `braces` 3.0.3, `http-cache-semantics` 4.2.0, `image-size` 1.2.1, `tmp` 0.0.33, `toml` 3.0.0, `undici` 5.29.0. Moderates: `decode-uri-component` 0.2.2, `sprintf-js`, `stream-json` 1.9.1, `uuid` 8.3.2 and 9.0.1.
+- Native Solana launch, default immutable tax, creator fees, anti-sniper, and a locker explorer are still recommendations.

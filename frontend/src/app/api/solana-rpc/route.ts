@@ -12,7 +12,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { clusterApiUrl } from "@solana/web3.js";
-import { allowRequest, clientKey, MAX_RPC_BODY_BYTES, rpcBatchError } from "@/lib/apiLimits";
+import { allowRequestShared, clientKey, MAX_RPC_BODY_BYTES, rpcBatchError } from "@/lib/apiLimits";
 
 /** Allowlist of Solana JSON-RPC methods the proxy will forward. requestAirdrop is omitted: it spends faucet SOL and RPC credit. */
 const ALLOWED_METHODS = new Set([
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     process.env.SOLANA_RPC_URL ??
     clusterApiUrl(network);
 
-  if (!allowRequest(`solana:${clientKey((name) => request.headers.get(name))}`, 120, 60_000)) {
+  if (!await allowRequestShared(`solana:${clientKey((name) => request.headers.get(name))}`, 120, 60_000)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

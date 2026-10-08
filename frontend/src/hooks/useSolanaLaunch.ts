@@ -14,7 +14,7 @@
 
 import { useState, useCallback }       from "react";
 import { useWallet, useConnection }    from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { PublicKey, SystemProgram, Transaction, Keypair, SYSVAR_CLOCK_PUBKEY, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   createWalletClient,
@@ -31,7 +31,7 @@ import {
   TOKEN_BURN_BRIDGE_PROGRAM_ID,
   BRIDGE_CONFIG_SEED,
   USER_NONCE_SEED,
-  DISCRIMINATOR_BURN_AND_BRIDGE,
+  DISCRIMINATOR_BURN_AND_POST,
 } from "@/lib/solanaIdl";
 import { BURN_BRIDGE_RECEIVER_ABI } from "@/lib/burnBridgeReceiverAbi";
 
@@ -257,7 +257,20 @@ async function executeBurnAndBridge(
   // ── Build the burnAndBridge instruction manually ────────────────────────────
   // We avoid importing @coral-xyz/anchor in the browser bundle to keep bundle
   // size lean. The discriminator is the single source of truth from solanaIdl.ts.
-  const discriminator = DISCRIMINATOR_BURN_AND_BRIDGE;
+  const discriminator = DISCRIMINATOR_BURN_AND_POST;
+  const wormholeProgram = new PublicKey(
+    params.isTestnet
+      ? "3u8hJUVTA4jH1wYAyUur7FFZVQ8H635K3tSHHF4ssjQ5"
+      : "worm2ZoG2kUd4vFXhvJh93UUH596ayRfgQ2MgjNMTth"
+  );
+  const [emitterPda] = PublicKey.findProgramAddressSync([Buffer.from("emitter")], programId);
+  const [wormholeBridge] = PublicKey.findProgramAddressSync([Buffer.from("Bridge")], wormholeProgram);
+  const [feeCollector] = PublicKey.findProgramAddressSync([Buffer.from("fee_collector")], wormholeProgram);
+  const [sequencePda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("Sequence"), emitterPda.toBuffer()],
+    wormholeProgram
+  );
+  const wormholeMessage = Keypair.generate();
 
   // Primary chain: first in list, or 0 for "all chains"
   const primaryChainId = params.targetChainIds.length === 1 ? params.targetChainIds[0] : 0;
@@ -274,7 +287,7 @@ async function executeBurnAndBridge(
   amountBuf.writeUInt32LE(hi, 4);
 
   chainBuf.writeUInt16LE(primaryChainId, 0);
-  consistBuf.writeUInt8(1, 0); // confirmed
+  consistBuf.writeUInt8(32, 0); // finalized; the program maps >= 32 to Wormhole's Finalized enum
 
   const data = Buffer.concat([
     discriminator,
@@ -294,13 +307,39 @@ async function executeBurnAndBridge(
     { pubkey: userPubkey,              isSigner: true,  isWritable: true  },
     { pubkey: TOKEN_PROGRAM_ID,        isSigner: false, isWritable: false },
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    { pubkey: wormholeProgram,         isSigner: false, isWritable: false },
+    { pubkey: wormholeBridge,          isSigner: false, isWritable: true  },
+    { pubkey: wormholeMessage.publicKey, isSigner: true, isWritable: true },
+    { pubkey: emitterPda,              isSigner: false, isWritable: false },
+    { pubkey: sequencePda,             isSigner: false, isWritable: true  },
+    { pubkey: feeCollector,            isSigner: false, isWritable: true  },
+    { pubkey: SYSVAR_CLOCK_PUBKEY,     isSigner: false, isWritable: false },
+    { pubkey: SYSVAR_RENT_PUBKEY,      isSigner: false, isWritable: false },
   ];
 
   const ix = new TransactionInstruction({ keys, programId, data });
 
+  const bridgeInfo = await connection.getAccountInfo(wormholeBridge);
+  let wormholeFee = 0;
+  if (bridgeInfo && bridgeInfo.data.length >= 24) {
+    const fee = bridgeInfo.data.readBigUInt64LE(16);
+    if (fee > BigInt(Number.MAX_SAFE_INTEGER)) {
+      throw new Error("Wormhole bridge fee is larger than this client can transfer.");
+    }
+    wormholeFee = Number(fee);
+  }
+
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
   const tx = new Transaction({ feePayer: userPubkey, blockhash, lastValidBlockHeight });
+  if (wormholeFee > 0) {
+    tx.add(SystemProgram.transfer({
+      fromPubkey: userPubkey,
+      toPubkey: feeCollector,
+      lamports: wormholeFee,
+    }));
+  }
   tx.add(ix);
+  tx.partialSign(wormholeMessage);
 
   const signature = await sendTransaction(tx, connection);
   await connection.confirmTransaction({ signature, blockhash, lastValidBlockHeight }, "confirmed");
@@ -433,8 +472,8 @@ async function submitVAAToEVM(
       account,
       address:      receiverAddress,
       abi:          BURN_BRIDGE_RECEIVER_ABI,
-      functionName: "receiveRelayedMessage",
-      args:         [vaa.payloadBytes],
+      functionName: "receiveMessage",
+      args:         [vaa.vaaBytes],
       chain:        null,
     });
 
@@ -442,10 +481,9 @@ async function submitVAAToEVM(
     return txHash;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/trusted relayer/i.test(message)) {
+    if (/invalid VAA|emitter not allowed/i.test(message)) {
       throw new Error(
-        `${target.name} rejected the submission because this wallet is not an approved relayer. ` +
-        `Add it via setTrustedRelayer(...) or route through your backend relayer service.`
+        `${target.name} rejected the Wormhole proof. The guardian signatures or the emitter allowlist did not match.`
       );
     }
     throw error;

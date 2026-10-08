@@ -11,15 +11,7 @@ This creates a unique multi-chain token economics model where:
 
 > ⚠️ **Production Readiness Status**
 >
-> The Solana Anchor program emits a `BurnMessageEmitted` event but does **not yet CPI into the Wormhole `post_message` instruction**. On the EVM side, `BurnBridgeReceiver.receiveMessage()` currently **reverts** — it is a scaffold pending full Wormhole VAA integration.
->
-> For development and integration testing, use `BurnBridgeReceiver.receiveRelayedMessage()` together with a trusted off-chain relayer that decodes the Anchor event and submits the payload.
->
-> Payload length is **exactly 114 bytes**. Longer payloads are rejected so trailing bytes cannot mint the same burn twice. `targetChainId == 0` does **not** mint unless the receiver owner has called `setAcceptWildcardTarget(true)` — otherwise one Solana burn would mint on every chain. The mintable asset is `BridgeMintableToken`, and only its configured minter (the receiver) can mint.
->
-> To complete the production bridge, two tasks remain:
-> 1. Add the Wormhole `post_message` CPI call to the Anchor program's `burn_and_bridge` instruction.
-> 2. Uncomment and test the `IWormhole.parseAndVerifyVM()` code path in `BurnBridgeReceiver.receiveMessage()`.
+> `receiveMessage` calls Wormhole core `parseAndVerifyVM`, checks the emitter allowlist, and rejects a replay of the VAA hash or sequence. There is no trusted-relayer mint path. The Solana program posts the burn through `burn_and_post` (Wormhole `post_message`, instruction byte 1). `burn_and_bridge` still burns and emits an event for the local Anchor suite; it does not create a VAA, so the EVM receiver will not mint for it. Rotate the program id before any deploy. Admin changes on the receiver wait 24 hours.
 
 ---
 
@@ -78,9 +70,8 @@ uint64   nonce               (8 bytes, big-endian)
 ### EVM: `contracts/evm/contracts/bridge/BurnBridgeReceiver.sol`
 
 **Solidity contract** per EVM chain with:
-- `receiveMessage(encodedVAA)` — full Wormhole VAA path (production)
-- `receiveRelayedMessage(payload)` — trusted-relayer path (development); replay key is derived on-chain via `keccak256(payload)`
-- `_processPayload(payload)` — decodes payload, mints ERC20
+- `receiveMessage(encodedVAA)` — guardian-checked Wormhole VAA. Anyone may submit it.
+- `_processPayload(payload)` — decodes the 114-byte payload and mints the ERC-20
 
 **Security features:**
 - VAA verification via `IWormhole(wormholeCore).parseAndVerifyVM()`

@@ -40,3 +40,69 @@ export function rpcBatchError(parsed: unknown, allowed: ReadonlySet<string>): st
   }
   return null;
 }
+
+export interface RateLimitStore {
+  url: string;
+  token: string;
+}
+
+/** Upstash Redis REST or Vercel KV. Empty values mean "not configured". */
+export function rateLimitStore(env: Record<string, string | undefined>): RateLimitStore | null {
+  const url = (env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL || "").replace(/\/$/, "");
+  const token = env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN || "";
+  if (!url || !token) return null;
+  return { url, token };
+}
+
+export function rateLimitCommands(key: string, now: number, windowMs: number, member: string): string[][] {
+  return [
+    ["ZREMRANGEBYSCORE", key, "0", String(now - windowMs)],
+    ["ZADD", key, String(now), member],
+    ["ZCARD", key],
+    ["PEXPIRE", key, String(windowMs)],
+  ];
+}
+
+export function slidingWindowAllowed(count: number, limit: number): boolean {
+  return Number.isFinite(count) && count >= 0 && count <= limit;
+}
+
+/**
+ * Shared sliding window when a Redis/KV REST store is configured.
+ * Falls back to the in-memory limiter only when the store is unset.
+ * A configured store that errors denies the request.
+ */
+export async function allowRequestShared(
+  key: string,
+  limit: number,
+  windowMs: number,
+  opts: {
+    now?: number;
+    env?: Record<string, string | undefined>;
+    fetchImpl?: typeof fetch;
+    member?: string;
+  } = {}
+): Promise<boolean> {
+  const env = opts.env ?? process.env;
+  const store = rateLimitStore(env);
+  const now = opts.now ?? Date.now();
+  if (!store) return allowRequest(key, limit, windowMs, now);
+
+  const member = opts.member ?? `${now}:${Math.random().toString(16).slice(2)}`;
+  const fetchImpl = opts.fetchImpl ?? fetch;
+  try {
+    const response = await fetchImpl(`${store.url}/pipeline`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${store.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(rateLimitCommands(key, now, windowMs, member)),
+    });
+    if (!response.ok) return false;
+    const body = (await response.json()) as Array<{ result?: unknown }>;
+    return slidingWindowAllowed(Number(body?.[2]?.result), limit);
+  } catch {
+    return false;
+  }
+}

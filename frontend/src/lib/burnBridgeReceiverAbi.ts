@@ -1,8 +1,8 @@
 /**
  * burnBridgeReceiverAbi.ts – ABI for BurnBridgeReceiver.sol.
  *
- * Used by the frontend to submit Wormhole VAAs (or relayed messages) to the
- * BurnBridgeReceiver contract on each target EVM chain via viem.
+ * Used by the frontend to submit a guardian-signed Wormhole VAA to
+ * BurnBridgeReceiver.receiveMessage on each target EVM chain via viem.
  */
 
 export const BURN_BRIDGE_RECEIVER_ABI = [
@@ -12,16 +12,6 @@ export const BURN_BRIDGE_RECEIVER_ABI = [
     type: "function",
     stateMutability: "nonpayable",
     inputs:  [{ name: "encodedVAA", type: "bytes" }],
-    outputs: [],
-  },
-  {
-    name: "receiveRelayedMessage",
-    type: "function",
-    stateMutability: "nonpayable",
-    // messageKey is now derived on-chain from keccak256(payload) — not a parameter
-    inputs: [
-      { name: "payload", type: "bytes" },
-    ],
     outputs: [],
   },
 
@@ -69,11 +59,21 @@ export const BURN_BRIDGE_RECEIVER_ABI = [
     outputs: [{ name: "", type: "bool" }],
   },
   {
-    name: "isTrustedRelayer",
+    name: "trustedEmitters",
     type: "function",
     stateMutability: "view",
-    inputs:  [{ name: "relayer", type: "address" }],
+    inputs:  [
+      { name: "chainId", type: "uint16" },
+      { name: "emitter", type: "bytes32" },
+    ],
     outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    name: "adminDelay",
+    type: "function",
+    stateMutability: "view",
+    inputs:  [],
+    outputs: [{ name: "", type: "uint256" }],
   },
   {
     name: "owner",
@@ -83,43 +83,31 @@ export const BURN_BRIDGE_RECEIVER_ABI = [
     outputs: [{ name: "", type: "address" }],
   },
 
-  // ─── Admin ───────────────────────────────────────────────────────────────────
+  // ─── Admin (queued; execute after adminDelay) ────────────────────────────────
   {
-    name: "setTrustedRelayer",
+    name: "queueSetTrustedEmitter",
     type: "function",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "relayer", type: "address" },
-      { name: "trusted", type: "bool"    },
+      { name: "chainId", type: "uint16" },
+      { name: "emitter", type: "bytes32" },
+      { name: "allowed", type: "bool" },
     ],
-    outputs: [],
+    outputs: [
+      { name: "opId", type: "bytes32" },
+      { name: "eta", type: "uint256" },
+    ],
   },
   {
-    name: "setMintableToken",
+    name: "executeSetTrustedEmitter",
     type: "function",
     stateMutability: "nonpayable",
-    inputs:  [{ name: "token", type: "address" }],
-    outputs: [],
-  },
-  {
-    name: "setMintRatio",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs:  [{ name: "ratio", type: "uint256" }],
-    outputs: [],
-  },
-  {
-    name: "setWormholeCore",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs:  [{ name: "core", type: "address" }],
-    outputs: [],
-  },
-  {
-    name: "setTrustedSolanaEmitter",
-    type: "function",
-    stateMutability: "nonpayable",
-    inputs:  [{ name: "emitter", type: "bytes32" }],
+    inputs: [
+      { name: "chainId", type: "uint16" },
+      { name: "emitter", type: "bytes32" },
+      { name: "allowed", type: "bool" },
+      { name: "eta", type: "uint256" },
+    ],
     outputs: [],
   },
 
@@ -133,14 +121,6 @@ export const BURN_BRIDGE_RECEIVER_ABI = [
       { name: "evmRecipient",     type: "address",  indexed: true  },
       { name: "amountMinted",     type: "uint256",  indexed: false },
       { name: "solanaNonce",      type: "uint64",   indexed: false },
-    ],
-  },
-  {
-    name: "RelayerUpdated",
-    type: "event",
-    inputs: [
-      { name: "relayer", type: "address", indexed: false },
-      { name: "trusted", type: "bool",    indexed: false },
     ],
   },
   {
@@ -161,6 +141,10 @@ export const BURN_BRIDGE_RECEIVER_ABI = [
   {
     name: "TrustedEmitterUpdated",
     type: "event",
-    inputs: [{ name: "emitter", type: "bytes32", indexed: false }],
+    inputs: [
+      { name: "chainId", type: "uint16", indexed: false },
+      { name: "emitter", type: "bytes32", indexed: false },
+      { name: "allowed", type: "bool", indexed: false },
+    ],
   },
 ] as const;
