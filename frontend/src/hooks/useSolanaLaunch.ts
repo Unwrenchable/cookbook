@@ -360,40 +360,13 @@ function parseVaaEnvelope(vaaBytes: `0x${string}`): Pick<WormholeVAA, "sequence"
   };
 }
 
-function buildSimulatedPayload(
-  txHash: string,
-  params: Pick<SolanaLaunchParams, "targetChainIds" | "evmRecipient" | "burnAmount" | "tokenDecimals" | "tokenMint">
-): `0x${string}` {
-  const payload = Buffer.alloc(114, 0);
-
-  try {
-    new PublicKey(params.tokenMint).toBuffer().copy(payload, 0, 0, 32);
-  } catch {
-    // keep zeroed mint bytes for local simulation
-  }
-
-  Buffer.from(params.evmRecipient.replace(/^0x/i, "").padStart(40, "0"), "hex").copy(payload, 64);
-
-  const decimals = params.tokenDecimals ?? 9;
-  const rawAmount = BigInt(Math.max(1, Math.floor(params.burnAmount * 10 ** decimals)));
-  payload.writeBigUInt64BE(rawAmount, 96);
-
-  const targetChainId = params.targetChainIds.length === 1 ? params.targetChainIds[0] : 0;
-  payload.writeUInt16BE(targetChainId, 104);
-
-  const numericTail = BigInt(parseInt(txHash.slice(0, 12), 16) || Date.now());
-  payload.writeBigUInt64BE(numericTail, 106);
-
-  return `0x${payload.toString("hex")}` as `0x${string}`;
-}
-
 /**
  * Poll Wormhole Scan API for VAA(s) produced by a Solana tx.
- * Falls back to a simulated relay payload after timeout (development only).
+ * A timeout does not invent a payload. The wallet is not asked to submit one.
  */
 async function pollForVAAs(
   txHash:      string,
-  params:      Pick<SolanaLaunchParams, "targetChainIds" | "evmRecipient" | "burnAmount" | "tokenDecimals" | "tokenMint">,
+  _params:     Pick<SolanaLaunchParams, "targetChainIds" | "evmRecipient" | "burnAmount" | "tokenDecimals" | "tokenMint">,
   isTestnet:   boolean,
   maxRetries = 30,
   delayMs =    4_000
@@ -426,18 +399,7 @@ async function pollForVAAs(
     }
   }
 
-  // Simulation fallback — keeps UI functional during local dev / no-op mode
-  console.warn("[useSolanaLaunch] Wormhole VAA polling timed out — using simulated relayer payload");
-  return [
-    {
-      sequence:     String(Date.now()),
-      emitterChain: 1,
-      emitterAddr:  "0000000000000000000000000000000000000000000000000000000000000001",
-      vaaBytes:     `0x${"ab".repeat(100)}` as `0x${string}`,
-      payloadBytes: buildSimulatedPayload(txHash, params),
-      txHash,
-    },
-  ];
+  throw new Error("Wormhole proof was not available yet. No transaction was sent.");
 }
 
 /**
@@ -461,6 +423,10 @@ async function submitVAAToEVM(
     transport: custom((window as Window & { ethereum: unknown }).ethereum),
   });
   const [account] = await walletClient.getAddresses();
+  const walletChainId = await walletClient.getChainId();
+  if (walletChainId !== target.evmChainId) {
+    throw new Error(`Switch your wallet to ${target.name} (chain ${target.evmChainId}) before submitting. It is on chain ${walletChainId}.`);
+  }
 
   try {
     const txHash = await walletClient.writeContract({

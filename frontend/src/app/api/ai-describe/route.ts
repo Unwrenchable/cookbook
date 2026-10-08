@@ -3,6 +3,7 @@
  * Uses OpenAI gpt-4o-mini when OPENAI_API_KEY is set, otherwise returns a template.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { allowRequest, clientKey } from "@/lib/apiLimits";
 
 const FALLBACK_DESCRIPTIONS: Record<string, string> = {
   "Standard ERC20": "A clean, no-frills ERC20 token built for speed and simplicity. Pure utility, zero bloat. The OGs know what this is.",
@@ -23,6 +24,10 @@ const MAX_FLAVOR_LEN = 64;
 const MAX_VIBES_LEN  = 120;
 
 export async function POST(req: NextRequest) {
+  if (!allowRequest(`ai:${clientKey((name) => req.headers.get(name))}`, 20, 60_000)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const body = (await req.json()) as { name?: string; symbol?: string; flavor?: string; vibes?: string };
     const {
@@ -69,8 +74,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!res.ok) {
-      const txt = await res.text();
-      return NextResponse.json({ error: `OpenAI error: ${txt}` }, { status: 502 });
+      return NextResponse.json({ error: "Description service unavailable" }, { status: 502 });
     }
 
     const data = (await res.json()) as {
@@ -79,8 +83,7 @@ export async function POST(req: NextRequest) {
     const description = data.choices[0]?.message?.content?.trim() ?? "";
 
     return NextResponse.json({ description });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Description failed" }, { status: 500 });
   }
 }

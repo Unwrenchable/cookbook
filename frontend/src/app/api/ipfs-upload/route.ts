@@ -3,6 +3,7 @@
  * Falls back to mock hashes when PINATA_JWT is not set.
  */
 import { NextRequest, NextResponse } from "next/server";
+import { allowRequest, clientKey } from "@/lib/apiLimits";
 
 const PINATA_BASE = "https://api.pinata.cloud";
 
@@ -14,6 +15,10 @@ const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "ima
 const ALLOWED_EXTENSIONS = /\.(png|jpe?g|gif|webp)$/i;
 
 export async function POST(req: NextRequest) {
+  if (!allowRequest(`ipfs:${clientKey((name) => req.headers.get(name))}`, 20, 60_000)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -68,8 +73,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!imageRes.ok) {
-      const txt = await imageRes.text();
-      return NextResponse.json({ error: `Pinata image upload failed: ${txt}` }, { status: 502 });
+      return NextResponse.json({ error: "Image upload failed" }, { status: 502 });
     }
 
     const imageData = (await imageRes.json()) as { IpfsHash: string };
@@ -96,8 +100,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!metaRes.ok) {
-      const txt = await metaRes.text();
-      return NextResponse.json({ error: `Pinata metadata upload failed: ${txt}` }, { status: 502 });
+      return NextResponse.json({ error: "Metadata upload failed" }, { status: 502 });
     }
 
     const metaData = (await metaRes.json()) as { IpfsHash: string };
@@ -108,8 +111,7 @@ export async function POST(req: NextRequest) {
       metadataHash,
       metadataUri: `https://gateway.pinata.cloud/ipfs/${metadataHash}`,
     });
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }

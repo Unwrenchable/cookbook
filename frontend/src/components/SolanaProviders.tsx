@@ -39,11 +39,10 @@ export function SolanaProviders({ children, isTestnet = false, rpcEndpoint }: Pr
     if (rpcEndpoint) {
       return rpcEndpoint;
     }
-    const network = isTestnet ? "devnet" : "mainnet-beta";
-    if (typeof window === "undefined") {
-      return process.env.SOLANA_RPC_URL ?? clusterApiUrl(network);
-    }
-    return new URL(`/api/solana-rpc?network=${network}`, window.location.origin).toString();
+    // Public cluster URL on both server and client. SOLANA_RPC_URL is server-only
+    // and must not be read here: this file is a client component, and the SSR
+    // pass would otherwise embed a private RPC URL in the HTML.
+    return clusterApiUrl(isTestnet ? "devnet" : "mainnet-beta");
   }, [isTestnet, rpcEndpoint]);
 
   // Register explicit wallet adapters.

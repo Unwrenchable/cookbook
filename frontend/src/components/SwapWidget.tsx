@@ -241,12 +241,20 @@ export function SwapWidget() {
   const { writeContractAsync, isPending: isWritePending } = useWriteContract();
 
   async function handleSwap() {
-    if (!routerAddress || !address || amountInWei === 0n) return;
+    if (!address || amountInWei === 0n) return;
+    if (!routerAddress) {
+      setSwapError("No swap router is configured for this chain.");
+      return;
+    }
+    if (!estimatedOut || estimatedOut === 0n) {
+      setSwapError("Wait for a price quote. A swap without a minimum would accept any output.");
+      return;
+    }
     setSwapStatus("idle");
     setSwapError(null);
 
     const deadline = BigInt(Math.floor(Date.now() / 1000) + SWAP_DEADLINE_SECONDS);
-    const amountOutMin = estimatedOut ? (estimatedOut * 99n) / 100n : 0n; // 1% slippage
+    const amountOutMin = (estimatedOut * 99n) / 100n;
 
     try {
       if (isEthToToken) {

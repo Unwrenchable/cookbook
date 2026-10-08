@@ -53,6 +53,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     // ─── v2: percentage-based fee + referral ──────────────────────────────────
     uint16 public launchFeeBps;        // 50 = 0.5 % of msg.value (applied when > flat fee)
     uint16 public referralShareBps;    // 2000 = 20 % of the collected fee goes to referrer
+    bool public launchesPaused;        // emergency stop for new launches; existing tokens are untouched
     mapping(address => uint256) public referralEarnings;
 
     // ─── Template implementations ─────────────────────────────────────────────
@@ -84,6 +85,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
     event FeeRecipientUpdated(address newRecipient);
     event LaunchFeeBpsUpdated(uint16 newBps);
     event ReferralShareBpsUpdated(uint16 newBps);
+    event LaunchesPaused(bool paused);
     event ReferralEarned(address indexed referrer, address indexed user, uint256 amount);
 
     // ─── Constructor ──────────────────────────────────────────────────────────
@@ -139,6 +141,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         nonReentrant
         returns (address tokenAddress)
     {
+        require(!launchesPaused, "TokenFactory: launches paused");
         // launchFee is the flat minimum. Effective fee = max(launchFee, msg.value × launchFeeBps / 10000).
         // Any ETH above the effective fee is returned to the caller.
         require(msg.value >= launchFee, "TokenFactory: insufficient launch fee");
@@ -174,6 +177,7 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         returns (address tokenAddress)
     {
         // Same fee model as createToken: max(launchFee, msg.value × launchFeeBps / 10000).
+        require(!launchesPaused, "TokenFactory: launches paused");
         require(msg.value >= launchFee, "TokenFactory: insufficient launch fee");
         _validateParams(params);
 
@@ -264,6 +268,12 @@ contract TokenFactory is Ownable, ReentrancyGuard {
         require(_bps <= 5000, "TokenFactory: referral share too high");
         referralShareBps = _bps;
         emit ReferralShareBpsUpdated(_bps);
+    }
+
+    /// @notice Stop or resume new launches. Does not touch tokens already deployed.
+    function setLaunchesPaused(bool paused) external onlyOwner {
+        launchesPaused = paused;
+        emit LaunchesPaused(paused);
     }
 
     // ─── Internal ─────────────────────────────────────────────────────────────

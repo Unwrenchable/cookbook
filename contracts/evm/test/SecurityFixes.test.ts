@@ -106,6 +106,23 @@ describe("Security fixes", function () {
       ).to.be.revertedWith("TokenFactory: zero owner");
     });
 
+    it("lets the owner pause new launches without touching an existing token", async function () {
+      const token = await create();
+      await expect(factory.connect(user1).setLaunchesPaused(true)).to.be.revertedWithCustomError(
+        factory,
+        "OwnableUnauthorizedAccount"
+      );
+      await expect(factory.connect(owner).setLaunchesPaused(true))
+        .to.emit(factory, "LaunchesPaused")
+        .withArgs(true);
+      await expect(
+        factory.connect(user1).createToken(params(), { value: LAUNCH_FEE })
+      ).to.be.revertedWith("TokenFactory: launches paused");
+      expect(await ethers.provider.getCode(token)).to.not.equal("0x");
+      await factory.connect(owner).setLaunchesPaused(false);
+      await create();
+    });
+
     it("rejects the factory itself as fee recipient", async function () {
       await expect(
         factory.connect(owner).setFeeRecipient(await factory.getAddress())
