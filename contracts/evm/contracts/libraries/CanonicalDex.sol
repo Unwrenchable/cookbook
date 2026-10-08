@@ -117,6 +117,42 @@ library CanonicalDex {
                 true
             );
         }
+
+        // Testnet-only Uniswap V2. These chain ids are not mainnets.
+        // The factory and routers are CREATE2 of the bytecode published in
+        // @uniswap/v2-core 1.0.1 and @uniswap/v2-periphery 1.1.0-beta.0,
+        // deployed by 0x4e59b44847b379578588920cA78FbF26c0B4956C.
+        // feeToSetter is address(0). No other chain id returns these addresses.
+        // Until the deploy script runs, the router has no code and graduation reverts.
+        if (chainId == 80002) {
+            return Venue(
+                0x3523EDd2bae2120CDa175358EeE3Ab5F592015De,
+                0x8Fa06e2B5726Fbf82cf2559F661f52FD2B78A1f6,
+                0x360ad4f9a9A8EFe9A8DCB5f461c4Cc1047E1Dcf9,
+                false
+            );
+        }
+        if (chainId == 421614) {
+            return Venue(
+                0x24f058F5222e6b1b2845466C24372185EAb038e1,
+                0x8Fa06e2B5726Fbf82cf2559F661f52FD2B78A1f6,
+                0x980B62Da83eFf3D4576C647993b0c1D7faf17c73,
+                false
+            );
+        }
+        if (chainId == 84532 || chainId == 11155420) {
+            return Venue(
+                0x532dE1440A5996CF8ed38e517d9f5e3c77c8b7D9,
+                0x8Fa06e2B5726Fbf82cf2559F661f52FD2B78A1f6,
+                0x4200000000000000000000000000000000000006,
+                false
+            );
+        }
+    }
+
+    /// @notice True only for the four testnets whose router is our pinned deployment.
+    function testnetDeployment(uint256 chainId) internal pure returns (bool) {
+        return chainId == 80002 || chainId == 421614 || chainId == 84532 || chainId == 11155420;
     }
 
     function assertLive(Venue memory v) internal view {

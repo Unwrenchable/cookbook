@@ -31,3 +31,7 @@ contracts/solana/.anchor/
 contracts/solana/.anchor/test-ledger/
 contracts/solana/target/
 contracts/solana/programs/**/target/
+
+# Broadcast output. The README in this directory stays tracked.
+contracts/evm/deployments/**
+!contracts/evm/deployments/README.md

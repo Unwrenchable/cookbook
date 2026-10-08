@@ -17,4 +17,8 @@ contract CanonicalDexHarness {
     function assertLive(address router, address dexFactory, address wrappedNative, bool avaxNative) external view {
         CanonicalDex.assertLive(CanonicalDex.Venue(router, dexFactory, wrappedNative, avaxNative));
     }
+
+    function testnetDeployment(uint256 chainId) external pure returns (bool) {
+        return CanonicalDex.testnetDeployment(chainId);
+    }
 }

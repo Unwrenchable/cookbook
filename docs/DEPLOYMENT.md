@@ -129,14 +129,28 @@ pnpm deploy:arbitrumSepolia
 pnpm deploy:baseSepolia
 ```
 
+Set `SOLANA_EMITTER` in `contracts/evm/.env` to the rotated burn-bridge program id (32-byte hex). The script rejects a zero emitter and the leaked program id. Optional: `FEE_RECIPIENT` (defaults to the deployer on testnet), `LAUNCH_FEE` (default `0.001`, cap 1 ether), and a `*_RPC_URL` override. Public RPC fallbacks are in `hardhat.config.ts`.
+
+```bash
+# Optimism Sepolia
+pnpm deploy:optimismSepolia
+
+# Same script, explorer verification of our contracts
+VERIFY=1 pnpm deploy:sepolia
+```
+
 Each command runs `scripts/deploy.ts`, which:
 
-1. Deploys all **9 template implementations** (StandardERC20, TaxableERC20, DeflationaryERC20, ReflectionERC20, BondingCurveToken, AIAgentToken, PolitiFiToken, UtilityHybridToken, PumpMigrateToken)
-2. Deploys the **TokenFactory** pointing to all templates
-3. Deploys the **LPLocker**
-4. Prints a JSON deployment summary
+1. On Polygon Amoy, Arbitrum Sepolia, Base Sepolia, and OP Sepolia, deploys the pinned Uniswap V2 bytecode first (`docs/TESTNET_DEX.md`)
+2. Deploys all **9 template implementations**
+3. Deploys the **TokenFactory** (24-hour admin delay, launch fee at most 1 ether)
+4. Deploys the **LPLocker**
+5. Deploys **BridgeMintableToken** and **BurnBridgeReceiver**, then calls `setMinter`
+6. Writes gitignored `deployments/<network>.json` and `deployments/<network>.env`, and prints the frontend env lines
 
-**Save the output.** It looks like this:
+`pnpm deploy:polygonMumbai` refuses. Mumbai is shut down. The separate `pnpm deploy:bridge:*` scripts only replace a receiver on a token you already deployed. Wormhole chain ids for the replaced testnets are the Wormhole testnet ids (Sepolia 10002, Amoy 10007, Arbitrum Sepolia 10003, Base Sepolia 10004, OP Sepolia 10005). BSC testnet stays 4.
+
+**Save the env lines.** The JSON looks like this:
 
 ```json
 {
@@ -158,13 +172,13 @@ Each command runs `scripts/deploy.ts`, which:
 }
 ```
 
-You only need `tokenFactory` and `lpLocker` addresses for the frontend.
+Paste `tokenFactory`, `lpLocker`, and `burnBridgeReceiver` into the frontend env. The matching lines are in `deployments/<network>.env`.
 
 ---
 
 ## 6. Verify Contracts on Etherscan
 
-After deploying, verify each contract so users can read the source on the block explorer. Run once per contract address:
+After deploying, verify each of our contracts so users can read the source on the block explorer. `VERIFY=1 pnpm deploy:sepolia` does this for the implementations, factory, locker, bridged token, and receiver. It does not verify the pinned Uniswap bytecode. You can also run the commands below once per contract address:
 
 ```bash
 # From contracts/evm/
@@ -322,25 +336,17 @@ The `ignoreCommand` in `vercel.json` skips rebuilds when only `contracts/` or `d
 
 ## 9. Deploy to Mainnet
 
-Once you've verified everything works on testnet, deploy to mainnet chains:
+Read `docs/MAINNET_CHECKLIST.md` first. The script refuses to broadcast unless both confirm variables are set and `FEE_RECIPIENT` is a nonzero address other than the deployer.
 
 ```bash
 # From contracts/evm/
+CONFIRM_MAINNET=yes-deploy-mainnet CONFIRM_NETWORK=mainnet \
+  FEE_RECIPIENT=0xYourMultisig SOLANA_EMITTER=0xYourRotatedProgramId \
+  pnpm deploy:mainnet
 
-pnpm deploy:mainnet        # Ethereum Mainnet
-pnpm deploy:bsc            # BNB Smart Chain
-pnpm deploy:polygon        # Polygon PoS
-pnpm deploy:arbitrum       # Arbitrum One
-pnpm deploy:base           # Base
-pnpm deploy:avalanche      # Avalanche C-Chain
+# Same flags, with CONFIRM_NETWORK set to the Hardhat name:
+# bsc, polygon, arbitrum, base, avalanche, optimism
 ```
-
-> **Mainnet checklist before deploying:**
-> - [ ] All tests pass (`pnpm test`)
-> - [ ] Deployer wallet has enough native token for gas on each chain
-> - [ ] `feeRecipient` in `scripts/deploy.ts` is set to your **treasury / multisig wallet** (not the deployer key — the default value is the deployer address, which means fees accumulate in the same hot wallet used for deployment)
-> - [ ] You've done a dry-run on testnet with the same parameters
-> - [ ] `.env` is not committed to git
 
 After each mainnet deploy:
 1. Copy the `tokenFactory` and `lpLocker` addresses into your Vercel project's **Environment Variables** dashboard (and update `frontend/.env.local` for local dev).
