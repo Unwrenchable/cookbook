@@ -6,11 +6,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../governance/DelayedAdmin.sol";
 
-interface IDexRouterView {
-    function factory() external view returns (address);
-    function WETH() external view returns (address);
-}
-
 /**
  * @title TokenFactory
  * @notice Factory contract that deploys parameterized token contracts using the minimal proxy (clone) pattern.
@@ -99,17 +94,12 @@ contract TokenFactory is Ownable, ReentrancyGuard, DelayedAdmin {
     event ReferralShareBpsUpdated(uint16 newBps);
     event LaunchesPaused(bool paused);
     event ReferralEarned(address indexed referrer, address indexed user, uint256 amount);
-    event DexRouterUpdated(address router);
-
-    /// @notice The only router pump tokens may graduate into. Set through the admin delay.
-    address public dexRouter;
 
     bytes32 private constant _TAG_IMPL = keccak256("setImplementation");
     bytes32 private constant _TAG_FEE = keccak256("setLaunchFee");
     bytes32 private constant _TAG_RECIPIENT = keccak256("setFeeRecipient");
     bytes32 private constant _TAG_FEE_BPS = keccak256("setLaunchFeeBps");
     bytes32 private constant _TAG_REFERRAL = keccak256("setReferralShareBps");
-    bytes32 private constant _TAG_ROUTER = keccak256("setDexRouter");
 
     modifier onlyAdmin() override {
         _checkOwner();
@@ -337,25 +327,6 @@ contract TokenFactory is Ownable, ReentrancyGuard, DelayedAdmin {
         _consume(_TAG_REFERRAL, abi.encode(bps), eta);
         referralShareBps = bps;
         emit ReferralShareBpsUpdated(bps);
-    }
-
-    function queueSetDexRouter(address router) external onlyOwner returns (bytes32 opId, uint256 eta) {
-        _checkRouter(router);
-        return _queue(_TAG_ROUTER, abi.encode(router));
-    }
-
-    function executeSetDexRouter(address router, uint256 eta) external {
-        _checkRouter(router);
-        _consume(_TAG_ROUTER, abi.encode(router), eta);
-        dexRouter = router;
-        emit DexRouterUpdated(router);
-    }
-
-    function _checkRouter(address router) internal view {
-        require(router != address(0), "TokenFactory: zero router");
-        require(router.code.length > 0, "TokenFactory: router has no code");
-        require(IDexRouterView(router).WETH() != address(0), "TokenFactory: router missing WETH");
-        require(IDexRouterView(router).factory() != address(0), "TokenFactory: router missing factory");
     }
 
     /// @notice Stop or resume new launches. Does not touch tokens already deployed.

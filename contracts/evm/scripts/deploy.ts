@@ -86,6 +86,9 @@ async function main() {
   console.log(`  TokenFactory       → ${factoryAddress}`);
   console.log(`  Launch fee         : ${ethers.formatEther(launchFee)} ETH`);
   console.log(`  Fee recipient      : ${feeRecipient}`);
+  console.log(
+    `  Pump router        : CanonicalDex for chain ${network.config.chainId}. No router argument.`
+  );
 
   // ─── 3. Deploy the LP Locker ──────────────────────────────────────────────
   console.log("\nDeploying LPLocker...");

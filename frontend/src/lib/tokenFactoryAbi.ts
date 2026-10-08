@@ -120,33 +120,6 @@ export const TOKEN_FACTORY_ABI = [
     stateMutability: "view",
     type: "function",
   },
-  {
-    inputs: [{ internalType: "address", name: "router", type: "address" }],
-    name: "queueSetDexRouter",
-    outputs: [
-      { internalType: "bytes32", name: "opId", type: "bytes32" },
-      { internalType: "uint256", name: "eta", type: "uint256" },
-    ],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [
-      { internalType: "address", name: "router", type: "address" },
-      { internalType: "uint256", name: "eta", type: "uint256" },
-    ],
-    name: "executeSetDexRouter",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "dexRouter",
-    outputs: [{ internalType: "address", name: "", type: "address" }],
-    stateMutability: "view",
-    type: "function",
-  },
   // queueSetLaunchFeeBps / executeSetLaunchFeeBps (owner queues, anyone executes after the delay)
   {
     inputs: [{ internalType: "uint16", name: "bps", type: "uint16" }],

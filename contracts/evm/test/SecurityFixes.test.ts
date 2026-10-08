@@ -3,6 +3,7 @@ import { ethers } from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { TokenFactory } from "../typechain-types";
+import { CANONICAL_DEX } from "../../../frontend/src/lib/canonicalDex";
 
 enum TokenFlavor {
   Standard = 0,
@@ -17,6 +18,33 @@ enum TokenFlavor {
 }
 
 const LAUNCH_FEE = ethers.parseEther("0.001");
+
+async function cloneHarness(router: string, avax: boolean) {
+  const Harness = await ethers.getContractFactory("PumpMigrateRouterHarness");
+  const impl = await Harness.deploy();
+  await impl.waitForDeployment();
+  const implAddress = (await impl.getAddress()).toLowerCase().replace(/^0x/, "");
+  const initCode = "0x3d602d80600a3d3981f3363d3d373d3d3d363d73" + implAddress + "5af43d82803e903d91602b57fd5bf3";
+  const tx = await (await ethers.getSigners())[0].sendTransaction({ data: initCode });
+  const receipt = await tx.wait();
+  const token = await ethers.getContractAt("PumpMigrateRouterHarness", receipt!.contractAddress!);
+  const [, user1, , user3] = await ethers.getSigners();
+  await token.initialize(
+    "MyToken",
+    "MTK",
+    ethers.parseEther("0.01"),
+    18,
+    100,
+    0,
+    0,
+    0,
+    user3.address,
+    0,
+    user1.address
+  );
+  await token.setRouterForTest(router, avax);
+  return token;
+}
 
 async function deployImplementations() {
   const names = [
@@ -65,14 +93,6 @@ describe("Security fixes", function () {
       flavor: TokenFlavor.Standard,
       ...overrides,
     };
-  }
-
-  async function setFactoryRouter(router: string) {
-    const queued = await factory.connect(owner).queueSetDexRouter(router);
-    const receipt = await queued.wait();
-    const eta = receipt!.logs.find((l: any) => l.fragment?.name === "AdminOpQueued").args.eta as bigint;
-    await time.increaseTo(eta);
-    await factory.executeSetDexRouter(router, eta);
   }
 
   async function create(flavorOverrides: Record<string, unknown> = {}, value = LAUNCH_FEE) {
@@ -412,43 +432,48 @@ describe("Security fixes", function () {
         token.connect(user1).setGraduationThreshold(1n)
       ).to.be.revertedWith("PumpMigrateToken: trading already started");
 
-      const graduatedAddress = await create({
+      const blocked = await create({
         flavor: TokenFlavor.PumpMigrate,
         totalSupply: ethers.parseEther("0.01"),
         buyTaxBps: 100,
         marketingWallet: user3.address,
       });
-      const graduated = await ethers.getContractAt("PumpMigrateToken", graduatedAddress);
-      const Router = await ethers.getContractFactory("MockUniswapV2Router");
-      const router = await Router.deploy();
-      await router.waitForDeployment();
-      await setFactoryRouter(await router.getAddress());
-      await graduated.connect(user2).buy(1, { value: ethers.parseEther("0.05") });
-      expect(await graduated.isGraduated()).to.equal(true);
-      expect(await graduated.liquidityMigrated()).to.equal(true);
-      expect(await graduated.ethReserve()).to.equal(0n);
-      expect(await ethers.provider.getBalance(graduatedAddress)).to.equal(0n);
-      expect(await router.balanceOf(await graduated.LP_BURN_ADDRESS())).to.be.gt(0n);
-      await expect(graduated.connect(user2).sell(1n, 0)).to.be.revertedWith(
-        "PumpMigrateToken: trading paused (graduating)"
+      const blockedToken = await ethers.getContractAt("PumpMigrateToken", blocked);
+      expect((await blockedToken.canonicalVenue()).router).to.equal(ethers.ZeroAddress);
+      await expect(blockedToken.connect(user2).buy(1, { value: ethers.parseEther("0.05") })).to.be.revertedWith(
+        "CanonicalDex: no router"
       );
-      expect(await graduated.dexRouter()).to.equal(await router.getAddress());
-      expect(await graduated.launchFactory()).to.equal(await factory.getAddress());
+      expect(await blockedToken.isGraduated()).to.equal(false);
+      expect(await blockedToken.ethReserve()).to.equal(0n);
+      expect(await blockedToken.tradingPaused()).to.equal(false);
+      expect(await blockedToken.launchFactory()).to.equal(await factory.getAddress());
+    });
+
+    it("selects the documented router for each chain and nothing for an unknown chain", async function () {
+      const Harness = await ethers.getContractFactory("CanonicalDexHarness");
+      const harness = await Harness.deploy();
+      await harness.waitForDeployment();
+      for (const venue of CANONICAL_DEX) {
+        const got = await harness.venue(venue.chainId);
+        expect(got.router).to.equal(venue.router);
+        expect(got.dexFactory).to.equal(venue.factory);
+        expect(got.wrappedNative).to.equal(venue.wrappedNative);
+        expect(got.avaxNative).to.equal(venue.avaxNative);
+      }
+      for (const chainId of [31337, 80001, 80002, 421614, 84532, 11155420]) {
+        const got = await harness.venue(chainId);
+        expect(got.router).to.equal(ethers.ZeroAddress);
+        expect(got.dexFactory).to.equal(ethers.ZeroAddress);
+        expect(got.wrappedNative).to.equal(ethers.ZeroAddress);
+      }
     });
 
     it("reverts graduation when the router misses the ETH minimum", async function () {
-      const tokenAddress = await create({
-        flavor: TokenFlavor.PumpMigrate,
-        totalSupply: ethers.parseEther("0.01"),
-        buyTaxBps: 100,
-        marketingWallet: user3.address,
-      });
-      const token = await ethers.getContractAt("PumpMigrateToken", tokenAddress);
       const Router = await ethers.getContractFactory("MockUniswapV2Router");
       const router = await Router.deploy();
       await router.waitForDeployment();
       await router.setShortEth(true);
-      await setFactoryRouter(await router.getAddress());
+      const token = await cloneHarness(await router.getAddress(), false);
       await expect(token.connect(user2).buy(1, { value: ethers.parseEther("0.05") })).to.be.revertedWith(
         "MockRouter: eth slippage"
       );
@@ -456,32 +481,47 @@ describe("Security fixes", function () {
       expect(await token.ethReserve()).to.equal(0n);
     });
 
-    it("rolls back a graduating buy when the router was never set", async function () {
-      const tokenAddress = await create({
-        flavor: TokenFlavor.PumpMigrate,
-        totalSupply: ethers.parseEther("0.01"),
-        buyTaxBps: 100,
-        marketingWallet: user3.address,
-      });
-      const token = await ethers.getContractAt("PumpMigrateToken", tokenAddress);
-      await expect(token.connect(user2).buy(1, { value: ethers.parseEther("0.05") })).to.be.revertedWith(
-        "PumpMigrateToken: router not set"
+    it("graduates through the injected router and through addLiquidityAVAX", async function () {
+      const Router = await ethers.getContractFactory("MockUniswapV2Router");
+      const router = await Router.deploy();
+      await router.waitForDeployment();
+      const token = await cloneHarness(await router.getAddress(), true);
+      await token.connect(user2).buy(1, { value: ethers.parseEther("0.05") });
+      expect(await token.isGraduated()).to.equal(true);
+      expect(await token.dexRouter()).to.equal(await router.getAddress());
+      expect(await router.balanceOf(await token.LP_BURN_ADDRESS())).to.be.gt(0n);
+      await expect(token.connect(user2).sell(1n, 0)).to.be.revertedWith(
+        "PumpMigrateToken: trading paused (graduating)"
       );
-      expect(await token.isGraduated()).to.equal(false);
-      expect(await token.ethReserve()).to.equal(0n);
-      expect(await token.tradingPaused()).to.equal(false);
     });
 
-    it("does not let the token creator send the reserve to a router that keeps it", async function () {
+    it("does not let anyone send the reserve to a router that keeps it", async function () {
       const Thief = await ethers.getContractFactory("StealingRouter");
       const thief = await Thief.deploy();
       await thief.waitForDeployment();
       const thiefAddress = await thief.getAddress();
 
-      await expect(factory.connect(user1).queueSetDexRouter(thiefAddress)).to.be.revertedWithCustomError(
-        factory,
-        "OwnableUnauthorizedAccount"
-      );
+      const queue = ethers.id("queueSetDexRouter(address)").slice(0, 10);
+      const execute = ethers.id("executeSetDexRouter(address,uint256)").slice(0, 10);
+      const padded = ethers.zeroPadValue(thiefAddress, 32).slice(2);
+      await expect(owner.sendTransaction({ to: await factory.getAddress(), data: queue + padded })).to.be.reverted;
+      await expect(user1.sendTransaction({ to: await factory.getAddress(), data: queue + padded })).to.be.reverted;
+      await expect(
+        owner.sendTransaction({
+          to: await factory.getAddress(),
+          data: execute + padded + ethers.zeroPadValue(ethers.toBeHex(1), 32).slice(2),
+        })
+      ).to.be.reverted;
+
+      const Harness = await ethers.getContractFactory("CanonicalDexHarness");
+      const registry = await Harness.deploy();
+      await registry.waitForDeployment();
+      for (const venue of CANONICAL_DEX) {
+        const got = await registry.venue(venue.chainId);
+        expect(got.router).to.not.equal(thiefAddress);
+      }
+      await expect(registry.assertLive(thiefAddress, CANONICAL_DEX[0].factory, CANONICAL_DEX[0].wrappedNative, false))
+        .to.be.revertedWith("CanonicalDex: factory mismatch");
 
       const tokenAddress = await create({
         flavor: TokenFlavor.PumpMigrate,
@@ -490,26 +530,15 @@ describe("Security fixes", function () {
         marketingWallet: user3.address,
       });
       const token = await ethers.getContractAt("PumpMigrateToken", tokenAddress);
+      const buyerBefore = await ethers.provider.getBalance(user2.address);
       await expect(token.connect(user2).buy(1, { value: ethers.parseEther("0.05") })).to.be.revertedWith(
-        "PumpMigrateToken: router not set"
+        "CanonicalDex: no router"
       );
       expect(await ethers.provider.getBalance(thiefAddress)).to.equal(0n);
-
-      const Router = await ethers.getContractFactory("MockUniswapV2Router");
-      const router = await Router.deploy();
-      await router.waitForDeployment();
-      const queued = await factory.connect(owner).queueSetDexRouter(thiefAddress);
-      const receipt = await queued.wait();
-      const eta = receipt!.logs.find((l: any) => l.fragment?.name === "AdminOpQueued").args.eta as bigint;
-      await expect(factory.executeSetDexRouter(thiefAddress, eta)).to.be.revertedWith("DelayedAdmin: too early");
-      expect(await factory.dexRouter()).to.equal(ethers.ZeroAddress);
-
-      await setFactoryRouter(await router.getAddress());
-      await token.connect(user2).buy(1, { value: ethers.parseEther("0.05") });
-      expect(await token.isGraduated()).to.equal(true);
-      expect(await token.dexRouter()).to.equal(await router.getAddress());
-      expect(await ethers.provider.getBalance(thiefAddress)).to.equal(0n);
-      expect(await router.balanceOf(await token.LP_BURN_ADDRESS())).to.be.gt(0n);
+      expect(await token.isGraduated()).to.equal(false);
+      expect(await token.ethReserve()).to.equal(0n);
+      expect(await ethers.provider.getBalance(tokenAddress)).to.equal(0n);
+      expect(await ethers.provider.getBalance(user2.address)).to.be.gt(buyerBefore - ethers.parseEther("0.05"));
     });
   });
 

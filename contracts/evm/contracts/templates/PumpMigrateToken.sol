@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "../libraries/LinearCurve.sol";
+import "../libraries/CanonicalDex.sol";
 
 interface IDexRouter {
     function factory() external view returns (address);
@@ -23,8 +24,8 @@ interface IDexFactory {
     function getPair(address tokenA, address tokenB) external view returns (address);
 }
 
-interface ILaunchFactory {
-    function dexRouter() external view returns (address);
+interface IJoeRouter {
+    function WAVAX() external view returns (address);
 }
 
 /**
@@ -39,10 +40,10 @@ interface ILaunchFactory {
  *  1. Token launches with a virtual token reserve (a supply offset, not a wei balance).
  *  2. Users buy via `buy()` — price increases linearly with supply.
  *  3. When `ethReserve >= graduationThreshold` the same buy migrates the reserve
- *     and an equal token amount into the factory's canonical router.
+ *     and an equal token amount into the canonical V2 router for `block.chainid`.
  *  4. LP tokens are minted to the burn address. Curve trading stays halted.
- *  5. The token creator cannot choose the router. Migration reads it from the
- *     launch factory at graduation, and migration can run once.
+ *  5. Neither the token creator nor the factory owner can choose the router.
+ *     The address comes from `CanonicalDex`. Migration can run once.
  *
  * This matches the pump.fun → Raydium migration pattern on Solana,
  * adapted for EVM (pump.fun → Uniswap/PancakeSwap).
@@ -72,7 +73,7 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
     uint16  public constant MAX_TRADING_FEE_BPS = 300;
 
     // ─── DEX config ───────────────────────────────────────────────────────────
-    /// @notice Factory that created this clone. Graduation reads `dexRouter()` from it.
+    /// @notice Factory that created this clone. It does not choose the router.
     address public launchFactory;
     /// @notice Router used at graduation. Written only inside `_migrate`.
     address public dexRouter;
@@ -237,16 +238,24 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
 
     // ─── Graduation ───────────────────────────────────────────────────────────
 
-    function _router() internal view returns (address router) {
-        router = ILaunchFactory(launchFactory).dexRouter();
-        require(router != address(0), "PumpMigrateToken: router not set");
-        require(IDexRouter(router).WETH() != address(0), "PumpMigrateToken: router missing WETH");
-        require(IDexRouter(router).factory() != address(0), "PumpMigrateToken: router missing factory");
+    /// @notice Registry entry for this chain. Zero when the chain has no verified router.
+    function canonicalVenue()
+        external
+        view
+        returns (address router, address dexFactory, address wrappedNative, bool avaxNative)
+    {
+        CanonicalDex.Venue memory v = CanonicalDex.venue(block.chainid);
+        return (v.router, v.factory, v.wrappedNative, v.avaxNative);
+    }
+
+    function _venue() internal view virtual returns (CanonicalDex.Venue memory v) {
+        v = CanonicalDex.venue(block.chainid);
+        CanonicalDex.assertLive(v);
     }
 
     function _migrate() internal {
         require(!liquidityMigrated, "PumpMigrateToken: already migrated");
-        address router = _router();
+        CanonicalDex.Venue memory v = _venue();
 
         uint256 ethIn = ethReserve;
         uint256 supply = totalSupply();
@@ -257,24 +266,15 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
         liquidityMigrated = true;
         graduatedAt = block.timestamp;
         ethReserve = 0;
-        dexRouter = router;
-        emit DexRouterUpdated(router);
+        dexRouter = v.router;
+        emit DexRouterUpdated(v.router);
 
         _mint(address(this), supply);
-        _approve(address(this), router, supply);
+        _approve(address(this), v.router, supply);
 
         uint256 ethMin = (ethIn * minMigrateEthBps) / 10_000;
         uint256 tokenMin = (supply * 9900) / 10_000;
-        (uint256 usedToken, uint256 usedEth, uint256 liquidity) = IDexRouter(router).addLiquidityETH{
-            value: ethIn
-        }(
-            address(this),
-            supply,
-            tokenMin,
-            ethMin,
-            LP_BURN_ADDRESS,
-            block.timestamp
-        );
+        (uint256 usedToken, uint256 usedEth, uint256 liquidity) = _addLiquidity(v, supply, tokenMin, ethMin, ethIn);
         require(liquidity > 0, "PumpMigrateToken: no liquidity");
         require(usedEth >= ethMin && usedToken >= tokenMin, "PumpMigrateToken: slippage");
 
@@ -286,14 +286,50 @@ contract PumpMigrateToken is Initializable, ERC20Upgradeable, OwnableUpgradeable
             require(ok, "PumpMigrateToken: leftover failed");
         }
 
-        address pair = IDexFactory(IDexRouter(router).factory()).getPair(
-            address(this),
-            IDexRouter(router).WETH()
-        );
+        address pair = IDexFactory(v.factory).getPair(address(this), v.wrappedNative);
         liquidityPair = pair;
         lpTokensLocked = liquidity;
         emit Graduated(ethIn, supply, block.timestamp);
         emit LiquidityAdded(pair, usedToken, usedEth);
+    }
+
+    function _addLiquidity(
+        CanonicalDex.Venue memory v,
+        uint256 supply,
+        uint256 tokenMin,
+        uint256 ethMin,
+        uint256 ethIn
+    ) internal returns (uint256 usedToken, uint256 usedEth, uint256 liquidity) {
+        if (v.avaxNative) {
+            (bool ok, bytes memory data) = v.router.call{value: ethIn}(
+                abi.encodeWithSelector(
+                    bytes4(keccak256("addLiquidityAVAX(address,uint256,uint256,uint256,address,uint256)")),
+                    address(this),
+                    supply,
+                    tokenMin,
+                    ethMin,
+                    LP_BURN_ADDRESS,
+                    block.timestamp
+                )
+            );
+            if (!ok) {
+                if (data.length > 0) {
+                    assembly {
+                        revert(add(data, 32), mload(data))
+                    }
+                }
+                revert("PumpMigrateToken: liquidity call failed");
+            }
+            return abi.decode(data, (uint256, uint256, uint256));
+        }
+        return IDexRouter(v.router).addLiquidityETH{value: ethIn}(
+            address(this),
+            supply,
+            tokenMin,
+            ethMin,
+            LP_BURN_ADDRESS,
+            block.timestamp
+        );
     }
 
     /**

@@ -27,6 +27,10 @@ contract MockUniswapV2Router is ERC20 {
         return weth;
     }
 
+    function WAVAX() external view returns (address) {
+        return weth;
+    }
+
     function getPair(address, address) external view returns (address) {
         return address(this);
     }
@@ -43,6 +47,28 @@ contract MockUniswapV2Router is ERC20 {
         address to,
         uint256
     ) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity) {
+        return _add(token, amountTokenDesired, amountTokenMin, amountETHMin, to);
+    }
+
+    /// @dev Same body as addLiquidityETH. Trader Joe V1 uses this name.
+    function addLiquidityAVAX(
+        address token,
+        uint256 amountTokenDesired,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
+        address to,
+        uint256
+    ) external payable returns (uint256 amountToken, uint256 amountETH, uint256 liquidity) {
+        return _add(token, amountTokenDesired, amountTokenMin, amountETHMin, to);
+    }
+
+    function _add(
+        address token,
+        uint256 amountTokenDesired,
+        uint256 amountTokenMin,
+        uint256 amountETHMin,
+        address to
+    ) internal returns (uint256 amountToken, uint256 amountETH, uint256 liquidity) {
         require(amountTokenDesired >= amountTokenMin, "MockRouter: token slippage");
         amountETH = shortEth ? msg.value / 2 : msg.value;
         require(amountETH >= amountETHMin, "MockRouter: eth slippage");

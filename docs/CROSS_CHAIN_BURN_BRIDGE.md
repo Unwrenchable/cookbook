@@ -11,7 +11,7 @@ This creates a unique multi-chain token economics model where:
 
 > ⚠️ **Production Readiness Status**
 >
-> `receiveMessage` calls Wormhole core `parseAndVerifyVM`, checks the emitter allowlist, and rejects a replay of the VAA hash or sequence. There is no trusted-relayer mint path. The Solana program posts the burn through `burn_and_post` (Wormhole `post_message`, instruction byte 1). The old `burn_and_bridge` instruction is not in the program, so a client that still sends it does not burn tokens. Rotate the program id before any deploy. Admin changes on the receiver wait 24 hours. Pump graduation uses the factory's timelocked router, not one chosen by the token creator.
+> `receiveMessage` calls Wormhole core `parseAndVerifyVM`, checks the emitter allowlist, and rejects a replay of the VAA hash or sequence. There is no trusted-relayer mint path. The Solana program posts the burn through `burn_and_post` (Wormhole `post_message`, instruction byte 1). The old `burn_and_bridge` instruction is not in the program, so a client that still sends it does not burn tokens. Rotate the program id before any deploy. Admin changes on the receiver wait 24 hours. Pump graduation uses the canonical V2 router hardcoded for `block.chainid`. There is no admin or creator setter.
 
 ---
 
