@@ -11,3 +11,22 @@ coverage/
 .vercel
 *.tsbuildinfo
 .turbo/
+# Environment files and local notes. Tracked .env.example files stay in git.
+.env
+.env.*
+*.env
+*.env.*
+.env*.txt
+*.env.txt
+!.env.example
+!**/.env.example
+!**/*.env.example
+
+# Nested checkout snapshot at the repo root. Do not commit.
+/cookbook-main/
+
+# Local validator state, test-ledger (validator logs, RocksDB, throwaway
+# keypairs), and program keypairs. Never commit these.
+contracts/solana/.anchor/
+contracts/solana/.anchor/test-ledger/
+contracts/solana/target/
