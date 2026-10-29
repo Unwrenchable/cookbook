@@ -18,6 +18,8 @@ export interface ChainConfig {
   iconUrl?: string;
   /** Address of the deployed TokenFactory contract on this chain (empty = not deployed) */
   factoryAddress: `0x${string}` | "";
+  /** Address of the deployed DomainRegistry (Supreme Goggles naming) on this chain (empty = not deployed) */
+  namingContractAddress?: `0x${string}` | "";
 }
 
 export const SUPPORTED_CHAINS: ChainConfig[] = [
@@ -31,6 +33,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://sepolia.etherscan.io",
     isTestnet: true,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_SEPOLIA || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_SEPOLIA || "") as `0x${string}`),
   },
   {
     id: 97,
@@ -41,6 +44,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://testnet.bscscan.com",
     isTestnet: true,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_BSC_TESTNET || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_BSC_TESTNET || "") as `0x${string}`),
   },
   {
     id: 80002,
@@ -51,6 +55,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://amoy.polygonscan.com",
     isTestnet: true,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_POLYGON_AMOY || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_POLYGON_AMOY || "") as `0x${string}`),
   },
   {
     id: 421614,
@@ -61,6 +66,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://sepolia.arbiscan.io",
     isTestnet: true,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_ARB_SEPOLIA || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_ARB_SEPOLIA || "") as `0x${string}`),
   },
   {
     id: 84532,
@@ -71,6 +77,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://sepolia.basescan.org",
     isTestnet: true,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_BASE_SEPOLIA || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_BASE_SEPOLIA || "") as `0x${string}`),
   },
   // ─── Mainnets ─────────────────────────────────────────────────────────────
   {
@@ -82,6 +89,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://etherscan.io",
     isTestnet: false,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_MAINNET || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_MAINNET || "") as `0x${string}`),
   },
   {
     id: 56,
@@ -92,6 +100,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://bscscan.com",
     isTestnet: false,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_BSC || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_BSC || "") as `0x${string}`),
   },
   {
     id: 137,
@@ -102,6 +111,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://polygonscan.com",
     isTestnet: false,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_POLYGON || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_POLYGON || "") as `0x${string}`),
   },
   {
     id: 42161,
@@ -112,6 +122,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://arbiscan.io",
     isTestnet: false,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_ARBITRUM || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_ARBITRUM || "") as `0x${string}`),
   },
   {
     id: 8453,
@@ -122,6 +133,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://basescan.org",
     isTestnet: false,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_BASE || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_BASE || "") as `0x${string}`),
   },
   {
     id: 43114,
@@ -132,6 +144,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://snowtrace.io",
     isTestnet: false,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_AVALANCHE || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_AVALANCHE || "") as `0x${string}`),
   },
   {
     id: 10,
@@ -142,6 +155,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://optimistic.etherscan.io",
     isTestnet: false,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_OPTIMISM || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_OPTIMISM || "") as `0x${string}`),
   },
   {
     id: 11155420,
@@ -152,6 +166,7 @@ export const SUPPORTED_CHAINS: ChainConfig[] = [
     blockExplorer: "https://sepolia-optimism.etherscan.io",
     isTestnet: true,
     factoryAddress: ((process.env.NEXT_PUBLIC_FACTORY_OP_SEPOLIA || "") as `0x${string}`),
+    namingContractAddress: ((process.env.NEXT_PUBLIC_NAMING_OP_SEPOLIA || "") as `0x${string}`),
   },
 ];
 

@@ -264,3 +264,42 @@ Follow the folder structure above. PRs welcome!
 
 *Built with ❤️ for degens who want to launch in 60 seconds.*
 
+
+---
+
+## FIZZ on GoonForge (the old "fizz.fun")
+
+The retro wasteland-themed token launch protocol (bonding curves, CRT terminal, FIZZ-TEC LABS flavor) now lives here as part of GoonForge.xyz at `/fizz/`.
+
+- Static themed experience copied/adapted from the Atomic Fizz side.
+- Actual deploys use the main launcher (EVM BondingCurveToken flavor or Solana flows).
+- Full Atomic Fizz game (Wasteland GPS claims, live radio with Fizzmaster Rex voice work, RealAi-powered NPCs, world events, Overseer) remains in its **separate repo** (atomicfizz / ATOMIC-FIZZ-CAPS-VAULT-77-WASTELAND-GPS) for clean boundaries.
+- They share the ecosystem: CAPS lore, cross-links, goon/degen wasteland vibe.
+
+See `/fizz/` for the classic experience and the main tabs for production multi-chain launches.
+
+## Code Organization Note (user's messy history)
+
+There is a large nested `cookbook-main/` (~150 files, 27MB) that duplicates most of the root. 
+Root (this) appears to be the git HEAD with recent agent/contract work.
+`cookbook-main` likely an earlier full copy (for "main" dev, agent sessions, or backup).
+Review diffs then consider archiving or deleting the nested copy to stop the "work tripled" problem.
+All primary wiring (useDeployToken + factory clones for flavors incl. BondingCurve, useSolanaLaunch for burn-bridge, Next tabs, APIs) lives under `frontend/src/` + `contracts/`.
+
+
+## Supreme Goggles Integration (Naming Layer)
+
+**Supreme Goggles** (originally https://github.com/Unwrenchable/supreme-goggles) is now integrated as a core feature of Goonforge.
+
+- New tab: **🕶️ Supreme Goggles**
+- Lifetime domain ownership for **any extension** you can dream up (`.fizz`, `.goon`, `.supreme`, `.myproject`, custom `.whatever`).
+- Perfect post-launch step: Deploy a token via the launcher (or the FIZZ wasteland protocol at `/fizz`), then immediately name it on-chain.
+- Re-uses Goonforge's multi-chain + testnet/mainnet toggle, wallet providers (RainbowKit + Solana adapter), and treasury patterns.
+- Contract: `DomainRegistry.sol` (ported) lives in `contracts/evm/contracts/naming/`. Deploy per chain (use the original supreme-goggles deploy scripts or Hardhat) and configure addresses.
+- Solana: References the `supreme_goggles` program (devnet ID in the source repo). Extend with burn-to-name flows if desired.
+- Ties directly to the FIZZ experience and the broader Atomic Fizz ecosystem (separate game repo for the full wasteland GPS + radio + RealAi NPCs).
+
+"Launch anything. Name it forever. See it through the supreme goggles."
+
+The original supreme-goggles repo remains useful for its rich standalone UI, detailed docs, and mobile guides if you want a dedicated naming dApp experience. The contracts + seamless in-launcher flow now live here for the combined degen platform.
+
